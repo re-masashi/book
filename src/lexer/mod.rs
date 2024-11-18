@@ -1,10 +1,10 @@
 pub mod tokens;
 
-use crate::lexer::tokens::{TokenType, Token};
-use crate::{Result};
-use std::{fs, io};
-use std::vec::IntoIter;
+use crate::lexer::tokens::{Token, TokenType};
+use crate::Result;
 use std::iter::Peekable;
+use std::vec::IntoIter;
+use std::{fs, io};
 
 pub struct Lexer {
     raw_data: Peekable<IntoIter<char>>,
@@ -19,7 +19,10 @@ impl Lexer {
     /// # Arguments
     /// * `file_path` - The path to the program file.
     pub fn from_file(file_path: &str) -> io::Result<Self> {
-        Ok(Self::from_text(&fs::read_to_string(file_path)?, file_path))
+        let mut text = &fs::read_to_string(file_path)?;
+        let binding = text.to_owned()+"";
+        text=&binding;
+        Ok(Self::from_text(text, file_path))
     }
 
     /// Create a lexer with the program data in plain text.
@@ -115,13 +118,17 @@ impl Iterator for Lexer {
             // if the identifier is a keyword, we add it as a keyword
             // else we treat it like a regular identifier
             match name {
+                s if *"let" == s => token = Ok(TokenType::Let),
+                s if *"fn" == s => token = Ok(TokenType::Fn),
                 s if *"if" == s => token = Ok(TokenType::If),
+                s if *"then" == s => token = Ok(TokenType::Then),
                 s if *"else" == s => token = Ok(TokenType::Else),
                 // s if *"for" == s => token = Ok(TokenType::For),
-                // s if *"while" == s => token = Ok(TokenType::While),
+                s if *"while" == s => token = Ok(TokenType::While),
                 s if *"in" == s => token = Ok(TokenType::In),
                 s if *"as" == s => token = Ok(TokenType::As),
                 s if *"do" == s => token = Ok(TokenType::Do),
+                s if *"def" == s => token = Ok(TokenType::Def),
                 s if *"end" == s => token = Ok(TokenType::End),
                 s if *"use" == s => token = Ok(TokenType::Use),
                 s if *"true" == s => token = Ok(TokenType::True),
@@ -129,7 +136,6 @@ impl Iterator for Lexer {
                 s => token = Ok(TokenType::Identifier(s)),
             };
         }
-
         // Integer Literal
         else if current_char.is_numeric() {
             let mut value = current_char.to_string();
@@ -138,7 +144,7 @@ impl Iterator for Lexer {
             // println!("{:?}", current_char);
 
             if self.raw_data.peek() == Some(&'.') {
-            	println!("float!");
+                println!("float!");
                 value += ".";
                 self.raw_data.next(); // eat '.'
                 self.get_next_char_while(&mut value, |c| c.is_numeric());
@@ -146,7 +152,7 @@ impl Iterator for Lexer {
                     Ok(i) => Ok(TokenType::Float(i)),
                     Err(_) => Err(format!("Integer literal {} is invalid", value)),
                 }
-            }else{
+            } else {
                 token = match value.parse() {
                     Ok(i) => Ok(TokenType::Int(i)),
                     Err(_) => Err(format!("Integer literal {} is invalid", value)),
@@ -179,7 +185,7 @@ impl Iterator for Lexer {
             if self.raw_data.peek() == Some(&'>') {
                 self.raw_data.next(); // Eat =
                 token = Ok(TokenType::PlusEq);
-            }else{
+            } else {
                 token = Ok(TokenType::Unknown);
             }
             // todo: panic?
@@ -281,7 +287,7 @@ impl Iterator for Lexer {
                 self.raw_data.next(); // Eat =
                 token = Ok(TokenType::GreaterEq);
             } else {
-                token = Ok(TokenType::GreaterEq);
+                token = Ok(TokenType::Greater);
             }
         }
         // Assign and Equal

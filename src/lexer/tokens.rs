@@ -6,12 +6,15 @@ pub enum TokenType {
     Identifier(String),
 
     // keywords
+    Let,
+    Fn,
     If,
     Else,
     // For,
-    // While,
+    While,
     In,
     As,
+    Def,
     Do,
     End,
     Then,

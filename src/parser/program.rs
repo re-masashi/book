@@ -1,59 +1,31 @@
 use crate::lexer::tokens::TokenType;
-use crate::parser::{AstNode, NodePosition, Parser, Function};
+use crate::parser::{Function, NodePosition, Parser};
 use crate::{unwrap_some, Result};
+use crate::interpreter::{TypedNode, Node, Expr, Literal};
 
-impl Parser {
-    pub fn parse_program(&mut self) -> Result<Vec<(AstNode, NodePosition)>> {
-        let mut ast: Vec<(AstNode, NodePosition)> = Vec::new();
+impl<'a> Parser<'_> {
+    pub fn parse_program(&'a mut self) -> Result<Node<'a>> {
+        let mut retval = Node::Program(vec![]);
+        let mut vals = vec![];
+
         loop {
-            match self.tokens.peek() {
-                Some(s) => match &s.type_ {
-                    TokenType::Identifier(_f)=>{
-                        let (func, pos) = self.parse_function().unwrap();
-                        ast.push((AstNode::FunctionDef(func), pos));
-                    }
-                    x=>panic!("{:?}", x)
-                },
-                None => return Ok(ast),
+            match self.parse_program_(){
+                Ok(result)=>vals.push(result),
+                Err(s) if s == "EOF".to_string()=>{
+                    break;
+                }
+                Err(e)=>return Err(e)
             }
-        }
+        };
+        Ok(Node::Program(vals))
     }
 
-    pub fn parse_function(&mut self) -> Result<(Function, NodePosition)>{
-        self.advance();
-        let f;
-        if let TokenType::Identifier(i) = self.tokens.next().unwrap().type_ {
-            f=i;
-        }else{
-            unreachable!()
-        }
-
-        let mut args = vec![];
-        // println!("{:?}", function_name);
-        while unwrap_some!(self.tokens.peek()).type_!=TokenType::Assign {
-            self.advance();
-            match unwrap_some!(self.tokens.next()).type_ {
-                TokenType::Identifier(a) => {
-                    println!("arg: {:?}", a);
-                    args.push((a, "unavailable".to_string()))
-                },
-                TokenType::Assign=>{}
-                _=>todo!()
-            }
-        }
-        // println!("{:?}", self.tokens.peek());
-        self.advance(); 
-        self.tokens.next(); // eat '='
-
-        match self.parse_expression() {
-            Ok((expression, pos))=>
-                Ok((Function {
-                    name: f.to_string(),
-                    args,
-                    expression,
-                    return_type: "unavailable".to_string()
-                }, pos)),
-            Err(e) => Err(e)
-        }
+    pub fn parse_program_(&mut self) -> Result<Node<'a>> {
+        match unwrap_some!(self.tokens.peek()).type_ {
+            TokenType::Def=>self.parse_function(),
+            _=>Ok(Node::Expr(Box::new(
+                self.parse_expression()?
+            )))
+        }.clone()
     }
 }

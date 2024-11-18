@@ -1,6 +1,6 @@
+pub mod interpreter;
 pub mod lexer;
 pub mod parser;
-pub mod interpreter;
 
 pub type Result<T> = std::result::Result<T, String>;
 

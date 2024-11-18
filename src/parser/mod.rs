@@ -1,86 +1,57 @@
 use crate::lexer::tokens::{Token, TokenType};
+use crate::interpreter::Expr;
 
 use std::iter::Peekable;
 use std::vec::IntoIter;
+use std::marker::PhantomData;
+use std::cell::RefCell;
 
 pub mod expression;
+pub mod function;
 pub mod program;
 
 type TokenIter = Peekable<IntoIter<Token>>;
 
-#[derive(Debug)]
-pub struct NodePosition {
-    pub pos: i32,
-    pub line_no: i32,
-    pub file: String,
-}
-
-// the top-level
-#[derive(Debug)]
-pub enum AstNode {
-    FunctionDef(Function),
-    Class(Class),
-    Expression(ExprValue),
-}
-
-// todo: remove the clone 
 #[derive(Debug, Clone)]
-pub enum ExprValue {
-    FnCall(String, Vec<ExprValue>),
-    UnOp(Box<TokenType>, Box<ExprValue>),
-    BinOp(Box<ExprValue>, Box<TokenType>, Box<ExprValue>),
-    Boolean(bool),
-    Integer(i64),
-    Float(f64),
-    String(String),
-    Identifier(String),
-    IfElse {
-        cond: Box<ExprValue>,
-        if_: Box<ExprValue>,
-        else_: Box<ExprValue>,
-        type_: String,
-    },
-    Assign {
-        name: String,
-        value: Box<ExprValue>,
-    },
-    Use(String),
-    Array(Vec<ExprValue>, String),
-    Do(Vec<ExprValue>),
-    Null // not available in the runtime
+pub struct NodePosition {
+    pub pos: usize,
+    pub line_no: usize,
+    pub file: String,
 }
 
 // 'def' name (args) '->' return_type { expressions}
 #[derive(Debug)]
-pub struct Function {
+pub struct Function<'a> {
     pub name: String,
     pub args: Vec<(String, String)>,
-    pub expression: ExprValue,
+    pub expression: Expr<'a>,
     pub return_type: String,
 }
 
 // 'class' name { functions }
 #[derive(Debug)]
-pub struct Class {
+pub struct Class<'a> {
     pub name: String,
-    pub fns: Vec<(Function, NodePosition)>,
+    pub fns: Vec<(Function<'a>, NodePosition)>,
 }
 
 /// A parser that generates an abstract syntax tree (AST).
-pub struct Parser {
+pub struct Parser<'a> {
     tokens: TokenIter,
     pos: i32,
     line_no: i32,
     file: String,
+    phantom: PhantomData<&'a i32>,
 }
 
-impl Parser {
+impl Parser<'_> {
     pub fn new(tokens: TokenIter, file_path: &str) -> Self {
         Parser {
-            tokens,
+            tokens: tokens,
             pos: -1,
             line_no: 1,
             file: file_path.to_string(),
+            phantom: PhantomData
         }
     }
 
@@ -98,39 +69,25 @@ impl Parser {
         }
     }
 
-    fn advance(&mut self) {
-        self.pos = match self.tokens.peek() {
-            Some(t) => t,
-            None => panic!("Dunno"),
-        }
-        .pos;
-        self.line_no = match self.tokens.peek() {
-            Some(t) => t,
-            None => panic!("Dunno"),
-        }
-        .line_no;
-        // self.tokens.next().expect("sumn went wrong idk why")
+    fn advance(&mut self) -> Token {  // Make `self` mutable
+        //  Use `as_ref()` to get shared references inside the closure:
+        let next_token = self.tokens.next().expect("Reached end of tokens unexpectedly"); // Expect instead of panic, with better error
+        self.pos = next_token.pos; // Assign directly
+        self.line_no = next_token.line_no;
+        next_token
     }
+}
 
-    fn parser_error(&self, cause: &str) -> String {
-//         format!(
-//             "
-// {text}
-// {pointy}
-// {cause}
+#[derive(Debug)]
+pub struct ParserError {
+    pos: NodePosition,
+    line_no: usize,
+    file: String,
+    message: String
+}
 
-//     at {line}:{pos} in file `{file}`.",
-//             text = read_to_string(self.file.clone())
-//                 .unwrap()
-//                 .lines()
-//                 .collect::<Vec<_>>()[(self.line_no - 1) as usize],
-//             pointy = ("~".repeat(self.pos as usize) + "^"),
-//             cause = cause,
-//             line = self.line_no,
-//             pos = self.pos,
-//             file = self.file
-//         )
-//         .to_string()
-		cause.to_string()
+impl ParserError {
+    fn new(line_no: usize, pos: NodePosition, file: String, message: String) -> ParserError {
+        ParserError { line_no, pos, file, message }
     }
 }
