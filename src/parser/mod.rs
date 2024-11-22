@@ -1,10 +1,9 @@
-use crate::lexer::tokens::{Token, TokenType};
 use crate::interpreter::Expr;
+use crate::lexer::tokens::{Token, TokenType};
 
 use std::iter::Peekable;
-use std::vec::IntoIter;
 use std::marker::PhantomData;
-use std::cell::RefCell;
+use std::vec::IntoIter;
 
 pub mod expression;
 pub mod function;
@@ -47,11 +46,11 @@ pub struct Parser<'a> {
 impl Parser<'_> {
     pub fn new(tokens: TokenIter, file_path: &str) -> Self {
         Parser {
-            tokens: tokens,
+            tokens,
             pos: -1,
             line_no: 1,
             file: file_path.to_string(),
-            phantom: PhantomData
+            phantom: PhantomData,
         }
     }
 
@@ -69,9 +68,13 @@ impl Parser<'_> {
         }
     }
 
-    fn advance(&mut self) -> Token {  // Make `self` mutable
+    fn advance(&mut self) -> Token {
+        // Make `self` mutable
         //  Use `as_ref()` to get shared references inside the closure:
-        let next_token = self.tokens.next().expect("Reached end of tokens unexpectedly"); // Expect instead of panic, with better error
+        let next_token = self
+            .tokens
+            .next()
+            .expect("Reached end of tokens unexpectedly"); // Expect instead of panic, with better error
         self.pos = next_token.pos; // Assign directly
         self.line_no = next_token.line_no;
         next_token
@@ -83,11 +86,16 @@ pub struct ParserError {
     pos: NodePosition,
     line_no: usize,
     file: String,
-    message: String
+    message: String,
 }
 
 impl ParserError {
     fn new(line_no: usize, pos: NodePosition, file: String, message: String) -> ParserError {
-        ParserError { line_no, pos, file, message }
+        ParserError {
+            line_no,
+            pos,
+            file,
+            message,
+        }
     }
 }

@@ -20,8 +20,8 @@ impl Lexer {
     /// * `file_path` - The path to the program file.
     pub fn from_file(file_path: &str) -> io::Result<Self> {
         let mut text = &fs::read_to_string(file_path)?;
-        let binding = text.to_owned()+"";
-        text=&binding;
+        let binding = text.to_owned() + "";
+        text = &binding;
         Ok(Self::from_text(text, file_path))
     }
 

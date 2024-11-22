@@ -5,14 +5,14 @@ use std::sync::Arc;
 
 pub fn optimise_node(node: &mut TypedNode) {
     match node {
-        TypedNode::Function(_, _, expr, _)=>optimise(&mut *expr),
-        TypedNode::Expr(expr, _)=>optimise(&mut *expr),
-        TypedNode::Program(nodes)=>{
+        TypedNode::Function(_, _, expr, _) => optimise(&mut *expr),
+        TypedNode::Expr(expr, _) => optimise(&mut *expr),
+        TypedNode::Program(nodes) => {
             for node in nodes {
                 optimise_node(node);
             }
         }
-        _=>{}
+        _ => {}
     }
 }
 
@@ -50,104 +50,103 @@ pub fn optimise_constant_fold(ast: &mut TypedExpr) {
         TypedExpr::BinaryOp(lhs, op, rhs, _) => {
             optimise_constant_fold(&mut *lhs);
             optimise_constant_fold(&mut *rhs);
-            match (lhs.as_ref(), op, rhs.as_ref()) {
-                (TypedExpr::Literal(a, _), op, TypedExpr::Literal(b, _)) => {
-                    temp = match (a.as_ref(), op, b.as_ref()) {
-                        (Literal::Int(a), BinaryOperator::Add, Literal::Int(b)) => {
-                            let res = Literal::Int(a + b);
-                            TypedExpr::Literal(res.into(), tconst!("int"))
+            if let (TypedExpr::Literal(a, _), op, TypedExpr::Literal(b, _)) =
+                (lhs.as_ref(), op, rhs.as_ref())
+            {
+                temp = match (a.as_ref(), op, b.as_ref()) {
+                    (Literal::Int(a), BinaryOperator::Add, Literal::Int(b)) => {
+                        let res = Literal::Int(a + b);
+                        TypedExpr::Literal(res.into(), tconst!("int"))
+                    }
+                    (Literal::Int(a), BinaryOperator::Sub, Literal::Int(b)) => {
+                        let res = Literal::Int(a - b);
+                        TypedExpr::Literal(res.into(), tconst!("int"))
+                    }
+                    (Literal::Int(a), BinaryOperator::Mul, Literal::Int(b)) => {
+                        let res = Literal::Int(a * b);
+                        TypedExpr::Literal(res.into(), tconst!("int"))
+                    }
+                    (Literal::Int(a), BinaryOperator::Div, Literal::Int(b)) => {
+                        if *b == 0 {
+                            panic!("ATTEMPTED TO DIVIDE BY 0");
                         }
-                        (Literal::Int(a), BinaryOperator::Sub, Literal::Int(b)) => {
-                            let res = Literal::Int(a - b);
-                            TypedExpr::Literal(res.into(), tconst!("int"))
-                        }
-                        (Literal::Int(a), BinaryOperator::Mul, Literal::Int(b)) => {
-                            let res = Literal::Int(a * b);
-                            TypedExpr::Literal(res.into(), tconst!("int"))
-                        }
-                        (Literal::Int(a), BinaryOperator::Div, Literal::Int(b)) => {
-                            if *b == 0 {
-                                panic!("ATTEMPTED TO DIVIDE BY 0");
-                            }
-                            let res = Literal::Int(a / b);
-                            TypedExpr::Literal(res.into(), tconst!("int"))
-                        }
+                        let res = Literal::Int(a / b);
+                        TypedExpr::Literal(res.into(), tconst!("int"))
+                    }
 
-                        (Literal::Int(a), BinaryOperator::Equal, Literal::Int(b)) => {
-                            let res = Literal::Boolean(a == b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        (Literal::Int(a), BinaryOperator::NotEqual, Literal::Int(b)) => {
-                            let res = Literal::Boolean(a != b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        (Literal::Int(a), BinaryOperator::Greater, Literal::Int(b)) => {
-                            let res = Literal::Boolean(a > b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        (Literal::Int(a), BinaryOperator::Less, Literal::Int(b)) => {
-                            let res = Literal::Boolean(a < b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        (Literal::Int(a), BinaryOperator::GreaterEqual, Literal::Int(b)) => {
-                            let res = Literal::Boolean(a >= b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        (Literal::Int(a), BinaryOperator::LessEqual, Literal::Int(b)) => {
-                            let res = Literal::Boolean(a <= b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
+                    (Literal::Int(a), BinaryOperator::Equal, Literal::Int(b)) => {
+                        let res = Literal::Boolean(a == b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    (Literal::Int(a), BinaryOperator::NotEqual, Literal::Int(b)) => {
+                        let res = Literal::Boolean(a != b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    (Literal::Int(a), BinaryOperator::Greater, Literal::Int(b)) => {
+                        let res = Literal::Boolean(a > b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    (Literal::Int(a), BinaryOperator::Less, Literal::Int(b)) => {
+                        let res = Literal::Boolean(a < b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    (Literal::Int(a), BinaryOperator::GreaterEqual, Literal::Int(b)) => {
+                        let res = Literal::Boolean(a >= b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    (Literal::Int(a), BinaryOperator::LessEqual, Literal::Int(b)) => {
+                        let res = Literal::Boolean(a <= b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
 
-                        // floats
-                        (Literal::Float(a), BinaryOperator::Add, Literal::Float(b)) => {
-                            let res = Literal::Float(a + b);
-                            TypedExpr::Literal(res.into(), tconst!("int"))
+                    // floats
+                    (Literal::Float(a), BinaryOperator::Add, Literal::Float(b)) => {
+                        let res = Literal::Float(a + b);
+                        TypedExpr::Literal(res.into(), tconst!("int"))
+                    }
+                    (Literal::Float(a), BinaryOperator::Sub, Literal::Float(b)) => {
+                        let res = Literal::Float(a - b);
+                        TypedExpr::Literal(res.into(), tconst!("int"))
+                    }
+                    (Literal::Float(a), BinaryOperator::Mul, Literal::Float(b)) => {
+                        let res = Literal::Float(a * b);
+                        TypedExpr::Literal(res.into(), tconst!("int"))
+                    }
+                    (Literal::Float(a), BinaryOperator::Div, Literal::Float(b)) => {
+                        if *b == 0.0 {
+                            panic!("ATTEMPTED TO DIVIDE BY 0");
                         }
-                        (Literal::Float(a), BinaryOperator::Sub, Literal::Float(b)) => {
-                            let res = Literal::Float(a - b);
-                            TypedExpr::Literal(res.into(), tconst!("int"))
-                        }
-                        (Literal::Float(a), BinaryOperator::Mul, Literal::Float(b)) => {
-                            let res = Literal::Float(a * b);
-                            TypedExpr::Literal(res.into(), tconst!("int"))
-                        }
-                        (Literal::Float(a), BinaryOperator::Div, Literal::Float(b)) => {
-                            if *b == 0.0 {
-                                panic!("ATTEMPTED TO DIVIDE BY 0");
-                            }
-                            let res = Literal::Float(a / b);
-                            TypedExpr::Literal(res.into(), tconst!("int"))
-                        }
+                        let res = Literal::Float(a / b);
+                        TypedExpr::Literal(res.into(), tconst!("int"))
+                    }
 
-                        (Literal::Float(a), BinaryOperator::Equal, Literal::Float(b)) => {
-                            let res = Literal::Boolean(a == b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        (Literal::Float(a), BinaryOperator::NotEqual, Literal::Float(b)) => {
-                            let res = Literal::Boolean(a != b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        (Literal::Float(a), BinaryOperator::Greater, Literal::Float(b)) => {
-                            let res = Literal::Boolean(a > b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        (Literal::Float(a), BinaryOperator::Less, Literal::Float(b)) => {
-                            let res = Literal::Boolean(a < b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        (Literal::Float(a), BinaryOperator::GreaterEqual, Literal::Float(b)) => {
-                            let res = Literal::Boolean(a >= b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        (Literal::Float(a), BinaryOperator::LessEqual, Literal::Float(b)) => {
-                            let res = Literal::Boolean(a <= b);
-                            TypedExpr::Literal(res.into(), tconst!("bool"))
-                        }
-                        _ => return,
-                    };
-                    to_swap = true;
-                }
-                _ => {}
+                    (Literal::Float(a), BinaryOperator::Equal, Literal::Float(b)) => {
+                        let res = Literal::Boolean(a == b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    (Literal::Float(a), BinaryOperator::NotEqual, Literal::Float(b)) => {
+                        let res = Literal::Boolean(a != b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    (Literal::Float(a), BinaryOperator::Greater, Literal::Float(b)) => {
+                        let res = Literal::Boolean(a > b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    (Literal::Float(a), BinaryOperator::Less, Literal::Float(b)) => {
+                        let res = Literal::Boolean(a < b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    (Literal::Float(a), BinaryOperator::GreaterEqual, Literal::Float(b)) => {
+                        let res = Literal::Boolean(a >= b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    (Literal::Float(a), BinaryOperator::LessEqual, Literal::Float(b)) => {
+                        let res = Literal::Boolean(a <= b);
+                        TypedExpr::Literal(res.into(), tconst!("bool"))
+                    }
+                    _ => return,
+                };
+                to_swap = true;
             }
         } // lhs, op, rhs
         TypedExpr::UnaryOp(_op, expr, _) => {
@@ -264,10 +263,10 @@ pub fn optimise_const_branching_if(ast: &mut TypedExpr) {
                     to_swap = true;
                 }
                 _ => {
-                    optimise_const_branching_if(&mut **cond);
-                    optimise_const_branching_if(&mut **if_);
+                    optimise_const_branching_if(cond);
+                    optimise_const_branching_if(if_);
                     if let Some(pat) = else_ {
-                        optimise_const_branching_if(&mut **pat);
+                        optimise_const_branching_if(pat);
                     }
                 }
             }

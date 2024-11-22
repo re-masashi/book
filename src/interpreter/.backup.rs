@@ -1,3 +1,4 @@
+//doesnt compile but it's here cuz im abt to take a huge turn
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -8,15 +9,12 @@ use inkwell::values::{
 use inkwell::basic_block::BasicBlock;
 use inkwell::AddressSpace;
 use inkwell::{FloatPredicate, IntPredicate};
-use inkwell::targets::{CodeModel, RelocMode, FileType, Target, TargetMachine, TargetTriple, InitializationConfig};
-use inkwell::OptimizationLevel;
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::path::Path;
 
 use crate::interpreter::{
-    BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, TypedNode, UnaryOperator, TypeAnnot
+    BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, TypedNode, UnaryOperator,
 };
 use crate::tconst;
 
@@ -25,7 +23,7 @@ pub struct Generator<'ctx> {
     module: Module<'ctx>,
     builder: Builder<'ctx>,
     lambda_counter: i32,
-    variables: HashMap<String, (BasicValueEnum<'ctx>, Option<FunctionValue<'ctx>>, Arc<Type>)>
+    variables: HashMap<String, FunctionValue<'ctx>>
 }
 
 impl<'ctx> Generator<'ctx> {
@@ -42,7 +40,6 @@ impl<'ctx> Generator<'ctx> {
     }
 
     pub fn generate_program(&mut self, node: &TypedNode) -> Result<(), String> {
-        self.generate_extern("println".to_string(), vec![tconst!("int")], tconst!("int"))?;
         match node {
             TypedNode::Program(nodes) => {
                 let mut exprs = vec![];
@@ -53,9 +50,6 @@ impl<'ctx> Generator<'ctx> {
                         }
                         TypedNode::Expr(e, _) => {
                             exprs.push(*e.clone());
-                        }
-                        TypedNode::Extern(name, args, ret) =>{
-                            self.generate_extern(name.to_string(), args.to_vec(), ret.clone())?;
                         }
                         _ => unreachable!(),
                     }
@@ -71,35 +65,7 @@ impl<'ctx> Generator<'ctx> {
             }
             _ => unreachable!(),
         };
-
-        let default_triple = TargetMachine::get_default_triple();
-
-        Target::initialize_x86(&InitializationConfig::default());
-
-        let opt = OptimizationLevel::Aggressive;
-        let reloc = RelocMode::Default;
-        let model = CodeModel::Default;
-        let path = Path::new("./main.o");
-        let target = Target::from_name("x86-64").unwrap();
-        let target_machine = target.create_target_machine(
-            &default_triple,
-            "x86-64",
-            "+avx2",
-            opt,
-            reloc,
-            model
-        )
-        .unwrap();
-
-        self.module.verify();
-        self.module.run_passes(
-            "tailcallelim,mem2reg,bdce,dce,dse",
-            &target_machine,
-            inkwell::passes::PassBuilderOptions::create()
-        ).unwrap();
         self.print_ir();
-
-        assert!(target_machine.write_to_file(&self.module, FileType::Object, &path).is_ok());
         // println!("{:#?}\n====", node);
         Ok(())
     }
@@ -127,11 +93,7 @@ impl<'ctx> Generator<'ctx> {
                     
                     self.variables.insert(
                         name.to_string(),
-                        (
-                            function.as_global_value().as_basic_value_enum(), 
-                            Some(function.clone()),
-                            type_.clone()
-                        )
+                        function
                     );
 
                     // println!("function {name} added to module");
@@ -144,11 +106,8 @@ impl<'ctx> Generator<'ctx> {
                         let arg_value = function.get_nth_param(i as u32).unwrap();
                         let alloca = self.builder.build_alloca(arg_value.get_type(), arg_name).unwrap();
                         self.builder.build_store(alloca, arg_value);
-                        self.variables
-                            .insert(
-                                arg_name.to_string(), 
-                                (alloca.into(), None, type_.clone())
-                            );
+                        // self.variables
+                        //     .insert(arg_name.to_string(), argfn);
                     }
 
                     // println!("args generated for function {name}");
@@ -156,7 +115,7 @@ impl<'ctx> Generator<'ctx> {
                     // println!("exp {:#?}", *expr.clone());
 
                     // println!("function {name} started building expressions");
-                    let (returned_val, _) = self.generate_expression(*expr.clone(), function)?;
+                    let returned_val = self.generate_expression(*expr.clone(), function)?;
                     // println!("function {name} built return");
 
                     match returned_val.get_type() {
@@ -168,7 +127,7 @@ impl<'ctx> Generator<'ctx> {
 
                     // Verify the function
                     if !function.verify(true) {
-                        return Err(format!("something went wrong during function `{name}` generation"));
+                        return Err("something went wrong during function generation".to_string());
                     }
 
                     Ok(function) // Return the function value
@@ -178,67 +137,57 @@ impl<'ctx> Generator<'ctx> {
         }
     }
 
-    fn generate_extern(
-        &mut self, 
-        name: String,
-        args: Vec<Arc<Type>>,
-        ret: Arc<Type>
-    ) -> Result<(), String> {
-        let ret_type = self.type_to_llvm(ret.clone());
-        let arg_types: Vec<BasicMetadataTypeEnum<'ctx>> = args
-            .iter()
-            .map(|type_| self.type_to_llvm(type_.clone()).into())
-            .collect();
-        let fn_type = ret_type.fn_type(arg_types.as_slice(), false);
-        let function = self.module.add_function(&name, fn_type, None);
-        
-        self.variables.insert(
-            name.to_string(),
-            (
-                function.as_global_value().as_basic_value_enum(), 
-                Some(function.clone()),
-                Type::Function(args, ret).into()
-            )
-        );
-        Ok(())
-    }
-
     fn generate_expression(
         &mut self,
         expression: TypedExpr,
         function: FunctionValue<'ctx>,
-    ) -> Result<(BasicValueEnum<'ctx>, Option<FunctionValue<'ctx>>), String> {
+    ) -> Result<BasicValueEnum<'ctx>, String> {
         match expression {
             TypedExpr::Let(name, expr, type_) => {
-                let (val, fn_) = self.generate_expression(*expr, function)?;
-                let alloca = self
-                    .builder
-                    .build_alloca(self.type_to_llvm(type_.clone()), &name)
-                    .unwrap();
-                self.builder.build_store(alloca, val);
+                let function_name = format!("$lambda_var_{name}_{}", self.lambda_counter);
+                self.lambda_counter += 1;
+
+                let arg_types: Vec<BasicMetadataTypeEnum<'ctx>> = vec![]; 
+                
+                let fn_type = self.type_to_llvm(type_).fn_type(&arg_types, false);
+                let function = self.module.add_function(&function_name, fn_type, None);
+
+                let basic_block = self.context.append_basic_block(function, "entry");
+                self.builder.position_at_end(basic_block);
+
+                let returned_val = self.generate_expression(*expr, function)?;
+
+                match returned_val.get_type() {
+                    BasicTypeEnum::ArrayType(_) => {
+                        self.builder.build_aggregate_return(&[returned_val])
+                    }
+                    _ => self.builder.build_return(Some(&returned_val)),
+                };
+
+                // Verify the function
+                if !function.verify(true) {
+                    return Err("something went wrong during lambda generation".to_string());
+                }
+
                 self.variables
                     .insert(
                         name.to_string(), 
-                        (alloca.into(), fn_, type_)
+                        function
                     );
 
-                Ok((alloca.as_basic_value_enum(), None))
+                Ok(function.as_global_value().as_basic_value_enum()) // Return the function value
             }
             TypedExpr::Variable(name, type_) => {
                 match self.variables.get(&name.to_string()) {
-                    Some((val, fn_, ty)) => {
-                        match ty.as_ref() {
-                            Type::Function(..) => {
-                                return Ok((*val, *fn_))
-                            },
-                            _ => {},
-                        }
-                        let value = self.builder.build_load(
-                            self.type_to_llvm(ty.clone()), 
-                            val.into_pointer_value(), 
-                            &name
-                        ).unwrap();
-                        Ok((value.into(), *fn_))
+                    Some(val) => {
+                        todo!()
+                        // // Make sure *ty and the expected type_ match!
+                        // if *ty != self.type_to_llvm(type_) {
+                        //     return Err(format!("Type mismatch for variable {}", name));
+                        // }
+
+                        // let value = self.builder.build_load(*ty, *val, &name).unwrap();
+                        // Ok(value.into())
                     }
                     None => {
                         return Err(format!("Undeclared variable: {}", name));
@@ -266,7 +215,7 @@ impl<'ctx> Generator<'ctx> {
                     self.builder.build_store(alloca.unwrap(), arg_value);
                 }
 
-                let (returned_val, _) = self.generate_expression(*body, function)?;
+                let returned_val = self.generate_expression(*body, function)?;
 
                 match returned_val.get_type() {
                     BasicTypeEnum::ArrayType(_) => {
@@ -280,11 +229,11 @@ impl<'ctx> Generator<'ctx> {
                     return Err("something went wrong during lambda generation".to_string());
                 }
 
-                Ok((function.as_global_value().as_basic_value_enum(), None)) // Return the function value
+                Ok(function.as_global_value().as_basic_value_enum()) // Return the function value
             }
-            TypedExpr::Literal(lit, _) => Ok((self.generate_literal(&lit.as_ref())?, None)),
+            TypedExpr::Literal(lit, _) => self.generate_literal(&lit.as_ref()),
             TypedExpr::If(cond, if_, else_, type_) => {
-                let (cond_val, _) = self.generate_expression(*cond, function)?;
+                let cond_val = self.generate_expression(*cond, function)?;
                 let then_bb = self.context.append_basic_block(function, "then");
                 let merge_bb = self.context.append_basic_block(function, "merge");
 
@@ -313,24 +262,18 @@ impl<'ctx> Generator<'ctx> {
 
                 // Then block
                 self.builder.position_at_end(then_bb);
-                let (then_val, _) = if let Some(else_bb) = else_bb {
-                    self.generate_expression(*if_, function)?
-                }else{
-                    self.generate_expression(*if_, function)?;
-                    (BasicValueEnum::IntValue(self.context.i32_type().const_zero()), None)
-                };
-
+                let then_val = self.generate_expression(*if_, function)?;
                 self.builder.build_unconditional_branch(merge_bb);
 
                 // Else block (if present)
                 let else_val = if let Some(else_bb) = else_bb {
                     self.builder.position_at_end(else_bb);
                     let else_expr = else_.unwrap(); //  <--- Add this line
-                    let (else_val, _) = self.generate_expression(*else_expr, function)?;
+                    let else_val = self.generate_expression(*else_expr, function)?;
                     self.builder.build_unconditional_branch(merge_bb);
                     else_val
                 } else {
-                    BasicValueEnum::IntValue(self.context.i32_type().const_zero()) // Default value
+                    self.type_to_llvm(type_.clone()).const_zero() // Default value
                 };
 
                 // Merge block (Now this is always correct)
@@ -338,12 +281,8 @@ impl<'ctx> Generator<'ctx> {
 
                 let phi = self
                     .builder
-                    .build_phi(match else_bb {
-                        Some(_) => self.type_to_llvm(type_),
-                        None => BasicTypeEnum::IntType(self.context.i32_type()),
-                    }, "iftmp")
+                    .build_phi(self.type_to_llvm(type_), "iftmp")
                     .unwrap();
-
 
                 if let Some(else_bb) = else_bb {
                     phi.add_incoming(&[(&then_val, then_bb), (&else_val, else_bb)]);
@@ -352,12 +291,12 @@ impl<'ctx> Generator<'ctx> {
                     // pre_if_bb is correct here
                 };
 
-                Ok((phi.as_basic_value().into(), None))
+                Ok(phi.as_basic_value().into())
             }
             TypedExpr::BinaryOp(lhs, op, rhs, type_) => {
                 // ... (Get lhs_val and rhs_val)
-                let (lhs_val, _) = self.generate_expression(*(lhs.clone()), function)?;
-                let (rhs_val, _) = self.generate_expression(*(rhs.clone()), function)?;
+                let lhs_val = self.generate_expression(*(lhs.clone()), function)?;
+                let rhs_val = self.generate_expression(*(rhs.clone()), function)?;
 
                 // Type checking (more sophisticated needed for mixed types)
                 let lhs_type = lhs_val.get_type();
@@ -449,7 +388,7 @@ impl<'ctx> Generator<'ctx> {
                     }
 
                     (BinaryOperator::Or, _, _) => {
-                        let (lhs_val, _) = self.generate_expression(*lhs, function)?;
+                        let lhs_val = self.generate_expression(*lhs, function)?;
                         let lhs_bool = self
                             .builder
                             .build_int_compare(
@@ -468,7 +407,7 @@ impl<'ctx> Generator<'ctx> {
                             .build_conditional_branch(lhs_bool, then_block, else_block);
 
                         self.builder.position_at_end(else_block);
-                        let (rhs_bool, _) = self.generate_expression(*rhs, function)?;
+                        let rhs_bool = self.generate_expression(*rhs, function)?;
                         let rhs_bool = self
                             .builder
                             .build_int_compare(
@@ -493,7 +432,7 @@ impl<'ctx> Generator<'ctx> {
                     }
 
                     (BinaryOperator::And, _, _) => {
-                        let (lhs_val, _) = self.generate_expression(*lhs, function)?;
+                        let lhs_val = self.generate_expression(*lhs, function)?;
                         let lhs_bool = self
                             .builder
                             .build_int_compare(
@@ -512,7 +451,7 @@ impl<'ctx> Generator<'ctx> {
                             .build_conditional_branch(lhs_bool, then_block, else_block);
 
                         self.builder.position_at_end(then_block);
-                        let (rhs_val, _) = self.generate_expression(*rhs, function)?;
+                        let rhs_val = self.generate_expression(*rhs, function)?;
                         let rhs_bool = self
                             .builder
                             .build_int_compare(
@@ -691,34 +630,28 @@ impl<'ctx> Generator<'ctx> {
                         ))
                     }
                 };
-                Ok((result, None))
+                Ok(result)
             }
             TypedExpr::Call(callee, args, _type_) => {
-                // Generate the function call
-                // todo!()
-                match self.generate_expression(*callee, function)?.1{
-                    Some(fn_)=>{
-                         let function_to_call = fn_;
-                         let mut compiled_args: Vec<BasicValueEnum> = vec![];
-                         
-                         args.iter().for_each(|arg| {
-                            print!("arg: {:?}", arg);
-                             compiled_args.push(self.generate_expression(*arg.clone(), function).unwrap().0)
-                         });
+                let callee_val = self.generate_expression(*callee, function)?;
+                let function_to_call= callee_val.into_pointer_value();
+                let mut compiled_args: Vec<BasicValueEnum> = vec![];
+                println!("{:?}", callee_val);
 
-                         let argsv: Vec<BasicMetadataValueEnum> =
-                             compiled_args.iter().by_ref().map(|&val| val.into()).collect();
+                args.iter().for_each(|arg| {
+                    compiled_args.push(self.generate_expression(*arg.clone(), function).unwrap())
+                });
 
-                         match self.builder.build_call(function_to_call, &argsv, "calltmp") {
-                             Ok(call_site_value) => {
-                                 Ok((call_site_value.try_as_basic_value().left().unwrap(), None))
-                             }
-                             Err(e) => {
-                                 Err(e.to_string())
-                             }
-                         }
-                    },
-                    None=>panic!("invalid call!"),
+                let argsv: Vec<BasicMetadataValueEnum> =
+                    compiled_args.iter().map(|&val| val.into()).collect();
+
+                match self.builder.build_call(
+                    function_to_call, 
+                    &argsv, 
+                    "calltmp"
+                ) {
+                    Ok(call_site_value) => Ok(call_site_value.try_as_basic_value().left().unwrap()),
+                    Err(e) => Err(e.to_string()),
                 }
             }
             TypedExpr::While(cond, body, _type_) => {
@@ -729,7 +662,7 @@ impl<'ctx> Generator<'ctx> {
                 self.builder.build_unconditional_branch(loop_start_block);
                 self.builder.position_at_end(loop_start_block);
 
-                let cond_value = self.generate_expression(*cond, function)?.0.into_int_value();
+                let cond_value = self.generate_expression(*cond, function)?.into_int_value();
 
                 self.builder.build_conditional_branch(cond_value, body_block, loop_end_block);
 
@@ -738,21 +671,21 @@ impl<'ctx> Generator<'ctx> {
                 self.builder.build_unconditional_branch(loop_start_block);
 
                 self.builder.position_at_end(loop_end_block);
-                Ok((self.context.i32_type().const_zero().into(), None))
+                Ok(self.context.i32_type().const_zero().into())
             }
             TypedExpr::UnaryOp(op, expr, type_) => {
-                let (val, _) = self.generate_expression(*expr, function)?;
+                let val = self.generate_expression(*expr, function)?;
                 match op {
-                    UnaryOperator::Negate if type_.as_ref() == tconst!("int").as_ref() => Ok((self
+                    UnaryOperator::Negate if type_.as_ref() == tconst!("int").as_ref() => Ok(self
                         .builder
                         .build_int_neg(val.into_int_value(), "neg")
                         .unwrap()
-                        .into(), None)),
-                    UnaryOperator::Not if type_.as_ref() == tconst!("bool").as_ref() => Ok((self
+                        .into()),
+                    UnaryOperator::Not if type_.as_ref() == tconst!("bool").as_ref() => Ok(self
                         .builder
                         .build_not(val.into_int_value(), "not")
                         .unwrap()
-                        .into(), None)),
+                        .into()),
                     _ => {
                         return Err(format!(
                             "Unsupported unary operator or type: {:?} {:?}",
@@ -777,7 +710,7 @@ impl<'ctx> Generator<'ctx> {
                 let ptr = self.builder.build_alloca(array_type, "tmparray").unwrap();
 
                 elements.iter().enumerate().for_each(|(i, elem)| {
-                    let (expr, _) = self.generate_expression(elem.clone(), function).unwrap();
+                    let expr = self.generate_expression(elem.clone(), function).unwrap();
 
                     let const_i = self.context.i64_type().const_int(i as u64, false);
                     let const_0 = self.context.i64_type().const_zero();
@@ -796,7 +729,7 @@ impl<'ctx> Generator<'ctx> {
                     self.builder.build_store(inner_ptr, expr);
                 });
 
-                Ok((ptr.into(), None))
+                Ok(ptr.into())
                 // let global_array = self.module.add_global(array_type, Some(AddressSpace::Const), "array_global").unwrap();
                 // global_array.set_initializer(&array_value);
                 // Ok(global_array.as_pointer_value().as_basic_value_enum())
@@ -810,17 +743,17 @@ impl<'ctx> Generator<'ctx> {
 
                 expressions_
                     .iter()
-                    .for_each(|expr| exprs.push(self.generate_expression(expr.clone(), function).unwrap().0));
+                    .for_each(|expr| exprs.push(self.generate_expression(expr.clone(), function)));
 
                 match exprs.last() {
-                    None => Ok((self.type_to_llvm(type_).const_zero().into(), None)),
-                    Some(v) => Ok((v.clone(), None)),
+                    None => Ok(self.context.i32_type().const_zero().into()),
+                    Some(v) => v.clone(),
                 }
             }
             // Handle array indexing
             TypedExpr::Index(array, index, type_) => {
-                let (array_val, _) = self.generate_expression(*array, function)?;
-                let (index_val, _) = self.generate_expression(*index, function)?;
+                let array_val = self.generate_expression(*array, function)?;
+                let index_val = self.generate_expression(*index, function)?;
 
                 match array_val.get_type() {
                     BasicTypeEnum::ArrayType(_) => {
@@ -828,14 +761,14 @@ impl<'ctx> Generator<'ctx> {
                             self.context.i32_type().const_zero(),
                             index_val.into_int_value(),
                         ];
-                        Ok((unsafe {
+                        Ok(unsafe {
                             self.builder.build_in_bounds_gep(
                                 self.type_to_llvm(type_),
                                 array_val.into_pointer_value(),
                                 &indices,
                                 "index_access",
                             ).unwrap()
-                        }.into(), None))
+                        }.into())
                     }
                     _ => Err(format!(
                         "Unsupported type for indexing: {:?}",

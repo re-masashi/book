@@ -1,3 +1,10 @@
-def add(x: i32, y) -> int
-	if true then 1 else 2
-1
+def count_to_100K(n: int) -> int do
+	if n<1000000 then do
+		println(n)
+		count_to_100K(n+1)
+	end
+end
+
+count_to_100K(100)
+
+false # a last expr in the end. else the parser crashes

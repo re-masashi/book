@@ -16,6 +16,12 @@ pub struct ControlFlowGraph<'a> {
     pub next_node_id: usize,
 }
 
+impl<'a> Default for ControlFlowGraph<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<'a> ControlFlowGraph<'a> {
     pub fn new() -> Self {
         ControlFlowGraph {
@@ -51,9 +57,7 @@ impl<'a> ControlFlowGraph<'a> {
 
                 let else_branch = match else_branch {
                     Some(expr) => expr,
-                    None => {
-                        return cond_id
-                    },
+                    None => return cond_id,
                 };
 
                 let mut else_block = Vec::new();
@@ -97,7 +101,7 @@ impl<'a> ControlFlowGraph<'a> {
                     Box::new(expr.clone()),
                     type_.clone(),
                 ));
-                
+
                 let block_id = self.add_node(Node::BasicBlock(current_block.clone())); // Create the basic block
 
                 block_id // Return the current block id
@@ -108,11 +112,9 @@ impl<'a> ControlFlowGraph<'a> {
                 //Fix for subtraction overflow:
                 if self.nodes.is_empty() {
                     0
-                }
-                else
-                {
-                    let block_id = self.nodes.len() - 1; // corrected line
-                    block_id
+                } else {
+                    // corrected line
+                    self.nodes.len() - 1
                 }
             }
         }

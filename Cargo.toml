@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-boxing = "0.1.2"
+inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm18-0", "llvm18-0-prefer-dynamic"] }
