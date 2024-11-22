@@ -92,8 +92,8 @@ impl<'a> ControlFlowGraph<'a> {
                 merge_id // Return the merge node id
             }
             TypedExpr::BinaryOp(ref lhs, op, ref rhs, ref type_) => {
-                let lhs_id = self.build_from_expr(*lhs.clone(), current_block);
-                let rhs_id = self.build_from_expr(*rhs.clone(), current_block);
+                let _lhs_id = self.build_from_expr(*lhs.clone(), current_block);
+                let _rhs_id = self.build_from_expr(*rhs.clone(), current_block);
 
                 current_block.push(TypedExpr::BinaryOp(
                     Box::new(expr.clone()),
@@ -113,7 +113,6 @@ impl<'a> ControlFlowGraph<'a> {
                 if self.nodes.is_empty() {
                     0
                 } else {
-                    // corrected line
                     self.nodes.len() - 1
                 }
             }

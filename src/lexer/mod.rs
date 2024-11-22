@@ -8,9 +8,9 @@ use std::{fs, io};
 
 pub struct Lexer {
     raw_data: Peekable<IntoIter<char>>,
-    pos: i32,
-    line_no: i32,
-    file: String,
+    pub pos: i32,
+    pub line_no: i32,
+    pub file: String,
 }
 
 impl Lexer {
@@ -117,43 +117,46 @@ impl Iterator for Lexer {
             // we check for identifiers.
             // if the identifier is a keyword, we add it as a keyword
             // else we treat it like a regular identifier
-            match name {
-                s if *"let" == s => token = Ok(TokenType::Let),
-                s if *"fn" == s => token = Ok(TokenType::Fn),
-                s if *"if" == s => token = Ok(TokenType::If),
-                s if *"then" == s => token = Ok(TokenType::Then),
-                s if *"else" == s => token = Ok(TokenType::Else),
+            match name.as_str() {
+                "let" => token = Ok(TokenType::Let),
+                "fn" => token = Ok(TokenType::Fn),
+                "if" => token = Ok(TokenType::If),
+                "then" => token = Ok(TokenType::Then),
+                "else" => token = Ok(TokenType::Else),
                 // s if *"for" == s => token = Ok(TokenType::For),
-                s if *"while" == s => token = Ok(TokenType::While),
-                s if *"in" == s => token = Ok(TokenType::In),
-                s if *"as" == s => token = Ok(TokenType::As),
-                s if *"do" == s => token = Ok(TokenType::Do),
-                s if *"def" == s => token = Ok(TokenType::Def),
-                s if *"end" == s => token = Ok(TokenType::End),
-                s if *"use" == s => token = Ok(TokenType::Use),
-                s if *"true" == s => token = Ok(TokenType::True),
-                s if *"false" == s => token = Ok(TokenType::False),
-                s => token = Ok(TokenType::Identifier(s)),
+                "while" => token = Ok(TokenType::While),
+                "in" => token = Ok(TokenType::In),
+                "as" => token = Ok(TokenType::As),
+                "do" => token = Ok(TokenType::Do),
+                "def" => token = Ok(TokenType::Def),
+                "end" => token = Ok(TokenType::End),
+                "use" => token = Ok(TokenType::Use),
+                "true" => token = Ok(TokenType::True),
+                "false" => token = Ok(TokenType::False),
+                "and" => token = Ok(TokenType::And),
+                "or" => token = Ok(TokenType::Or),
+                _ => token = Ok(TokenType::Identifier(name)),
             };
         }
         // Integer Literal
         else if current_char.is_numeric() {
             let mut value = current_char.to_string();
-            self.get_next_char_while(&mut value, |c| c.is_numeric());
+            self.get_next_char_while(&mut value, |c| c.is_numeric() || c=='_');
+            value = value.replace('_', "").to_string();
 
             // println!("{:?}", current_char);
 
             if self.raw_data.peek() == Some(&'.') {
-                println!("float!");
+                // println!("float!");
                 value += ".";
                 self.raw_data.next(); // eat '.'
                 self.get_next_char_while(&mut value, |c| c.is_numeric());
-                token = match value.parse() {
+                token = match value.parse::<f64>() {
                     Ok(i) => Ok(TokenType::Float(i)),
                     Err(_) => Err(format!("Integer literal {} is invalid", value)),
                 }
             } else {
-                token = match value.parse() {
+                token = match value.parse::<i64>() {
                     Ok(i) => Ok(TokenType::Int(i)),
                     Err(_) => Err(format!("Integer literal {} is invalid", value)),
                 }
@@ -186,7 +189,7 @@ impl Iterator for Lexer {
                 self.raw_data.next(); // Eat =
                 token = Ok(TokenType::PlusEq);
             } else {
-                token = Ok(TokenType::Unknown);
+                return Some(Err("Unknown token".to_string()))
             }
             // todo: panic?
         }
@@ -308,7 +311,7 @@ impl Iterator for Lexer {
                 token = Ok(TokenType::Not);
             }
         } else {
-            token = Ok(TokenType::Unknown)
+            return Some(Err("Unknown token".to_string()))
         }
 
         Some(Ok(Token {

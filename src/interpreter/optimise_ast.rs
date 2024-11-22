@@ -169,7 +169,7 @@ pub fn optimise_constant_fold(ast: &mut TypedExpr) {
         }
     };
     if to_swap {
-        println!("swapped");
+        // println!("swapped");
         *ast = temp;
     }
 }
@@ -270,9 +270,6 @@ pub fn optimise_const_branching_if(ast: &mut TypedExpr) {
                     }
                 }
             }
-            // if it matches a literal it must be a bool because of the type checked AST
-            // optimisation
-            return;
         }
         TypedExpr::Let(_, expr, _) => {
             // let mut exp = expr.clone();
@@ -314,7 +311,7 @@ pub fn optimise_const_branching_if(ast: &mut TypedExpr) {
         }
     };
     if to_swap {
-        println!("swapped if-else");
+        // println!("swapped if-else");
         *ast = temp;
     }
 }

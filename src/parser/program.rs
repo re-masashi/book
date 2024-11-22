@@ -5,7 +5,6 @@ use crate::{unwrap_some, Result};
 
 impl<'a> Parser<'_> {
     pub fn parse_program(&'a mut self) -> Result<Node<'a>> {
-        let retval = Node::Program(vec![]);
         let mut vals = vec![];
 
         loop {

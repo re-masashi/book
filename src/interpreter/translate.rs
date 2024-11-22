@@ -3,20 +3,20 @@ use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
 use inkwell::values::{
-    AnyValueEnum, BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, PointerValue
+    BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue
 };
-use inkwell::basic_block::BasicBlock;
 use inkwell::AddressSpace;
 use inkwell::{FloatPredicate, IntPredicate};
-use inkwell::targets::{CodeModel, RelocMode, FileType, Target, TargetMachine, TargetTriple, InitializationConfig};
+use inkwell::targets::{CodeModel, RelocMode, FileType, Target, TargetMachine, InitializationConfig};
 use inkwell::OptimizationLevel;
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::path::Path;
+use std::process::Command;
 
 use crate::interpreter::{
-    BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, TypedNode, UnaryOperator, TypeAnnot
+    BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, TypedNode, UnaryOperator
 };
 use crate::tconst;
 
@@ -25,24 +25,28 @@ pub struct Generator<'ctx> {
     module: Module<'ctx>,
     builder: Builder<'ctx>,
     lambda_counter: i32,
-    variables: HashMap<String, (BasicValueEnum<'ctx>, Option<FunctionValue<'ctx>>, Arc<Type>)>
+    variables: HashMap<String, (BasicValueEnum<'ctx>, Option<FunctionValue<'ctx>>, Arc<Type>)>,
+    file: String
 }
 
 impl<'ctx> Generator<'ctx> {
-    pub fn new(context: &'ctx Context, module_name: &str) -> Self {
-        let module = context.create_module(module_name);
+    pub fn new(context: &'ctx Context, file: String) -> Self {
+        let module = context.create_module(&file);
         let builder = context.create_builder();
         Self {
             context,
             module,
             builder,
             lambda_counter: 0,
-            variables: HashMap::new()
+            variables: HashMap::new(),
+            file: file
         }
     }
 
     pub fn generate_program(&mut self, node: &TypedNode) -> Result<(), String> {
         self.generate_extern("println".to_string(), vec![tconst!("int")], tconst!("int"))?;
+        self.generate_extern("printstr".to_string(), vec![tconst!("str")], tconst!("int"))?;
+
         match node {
             TypedNode::Program(nodes) => {
                 let mut exprs = vec![];
@@ -67,7 +71,7 @@ impl<'ctx> Generator<'ctx> {
                     Box::new(TypedExpr::Do(exprs, tconst!("int"))),
                     Type::Function(vec![], tconst!("int")).into(),
                 );
-                self.generate_function(&main_fn);
+                self.generate_function(&main_fn)?;
             }
             _ => unreachable!(),
         };
@@ -77,9 +81,10 @@ impl<'ctx> Generator<'ctx> {
         Target::initialize_x86(&InitializationConfig::default());
 
         let opt = OptimizationLevel::Aggressive;
-        let reloc = RelocMode::Default;
+        let reloc = RelocMode::PIC;
         let model = CodeModel::Default;
-        let path = Path::new("./main.o");
+        let binding = self.file.clone()+".o";
+        let path = Path::new(&binding);
         let target = Target::from_name("x86-64").unwrap();
         let target_machine = target.create_target_machine(
             &default_triple,
@@ -91,16 +96,28 @@ impl<'ctx> Generator<'ctx> {
         )
         .unwrap();
 
-        self.module.verify();
+        match self.module.verify(){
+            Ok(_)=>{}
+            Err(e)=>return Err(format!("couldn't verify the module!. {}", e))
+        };
         self.module.run_passes(
             "tailcallelim,mem2reg,bdce,dce,dse",
             &target_machine,
             inkwell::passes::PassBuilderOptions::create()
         ).unwrap();
+
         self.print_ir();
+
+        let exec_name = &(self.file.clone()[..=self.file.len()-4].to_string()+".out");
+        println!("emitting {:?}. binding {:?}", exec_name, binding);
 
         assert!(target_machine.write_to_file(&self.module, FileType::Object, &path).is_ok());
         // println!("{:#?}\n====", node);
+        Command::new("gcc") // todo: make this better
+            .args(["-O2", &(binding), "std.cc", "-o", exec_name])
+            .output()
+            .expect("failed to execute process");
+
         Ok(())
     }
 
@@ -108,7 +125,7 @@ impl<'ctx> Generator<'ctx> {
         match node {
             TypedNode::Function(name, args, expr, type_) => {
                 let (arg_types, ret_type) = match type_.as_ref().clone() {
-                    Type::Function(arg_types, ret_type) => {
+                    Type::Function(_arg_types, ret_type) => {
                         let arg_types: Vec<BasicMetadataTypeEnum<'ctx>> = args
                             .iter()
                             .map(|(_name, type_)| self.type_to_llvm(type_.clone()).into())
@@ -143,7 +160,7 @@ impl<'ctx> Generator<'ctx> {
                     for (i, (arg_name, type_)) in args.iter().enumerate() {
                         let arg_value = function.get_nth_param(i as u32).unwrap();
                         let alloca = self.builder.build_alloca(arg_value.get_type(), arg_name).unwrap();
-                        self.builder.build_store(alloca, arg_value);
+                        self.builder.build_store(alloca, arg_value).unwrap();
                         self.variables
                             .insert(
                                 arg_name.to_string(), 
@@ -159,11 +176,13 @@ impl<'ctx> Generator<'ctx> {
                     let (returned_val, _) = self.generate_expression(*expr.clone(), function)?;
                     // println!("function {name} built return");
 
-                    match returned_val.get_type() {
+                    if !match returned_val.get_type() {
                         BasicTypeEnum::ArrayType(_) => {
                             self.builder.build_aggregate_return(&[returned_val])
                         }
                         _ => self.builder.build_return(Some(&returned_val)),
+                    }.is_ok(){
+                        return Err("something went wrong during function return generation.".to_string())
                     };
 
                     // Verify the function
@@ -215,7 +234,7 @@ impl<'ctx> Generator<'ctx> {
                     .builder
                     .build_alloca(self.type_to_llvm(type_.clone()), &name)
                     .unwrap();
-                self.builder.build_store(alloca, val);
+                self.builder.build_store(alloca, val).unwrap();
                 self.variables
                     .insert(
                         name.to_string(), 
@@ -224,7 +243,7 @@ impl<'ctx> Generator<'ctx> {
 
                 Ok((alloca.as_basic_value_enum(), None))
             }
-            TypedExpr::Variable(name, type_) => {
+            TypedExpr::Variable(name, _type_) => {
                 match self.variables.get(&name.to_string()) {
                     Some((val, fn_, ty)) => {
                         match ty.as_ref() {
@@ -263,16 +282,18 @@ impl<'ctx> Generator<'ctx> {
                 for (i, (arg_name, _)) in args.iter().enumerate() {
                     let arg_value = function.get_nth_param(i as u32).unwrap();
                     let alloca = self.builder.build_alloca(arg_value.get_type(), arg_name);
-                    self.builder.build_store(alloca.unwrap(), arg_value);
+                    self.builder.build_store(alloca.unwrap(), arg_value).unwrap();
                 }
 
                 let (returned_val, _) = self.generate_expression(*body, function)?;
 
-                match returned_val.get_type() {
+                if !match returned_val.get_type() {
                     BasicTypeEnum::ArrayType(_) => {
                         self.builder.build_aggregate_return(&[returned_val])
                     }
                     _ => self.builder.build_return(Some(&returned_val)),
+                }.is_ok(){
+                    return Err("something went wrong during lambda generation.".to_string())
                 };
 
                 // Verify the function
@@ -288,7 +309,7 @@ impl<'ctx> Generator<'ctx> {
                 let then_bb = self.context.append_basic_block(function, "then");
                 let merge_bb = self.context.append_basic_block(function, "merge");
 
-                let else_bb = if let Some(ref else_expr) = else_ {
+                let else_bb = if let Some(ref _else_expr) = else_ {
                     Some(self.context.append_basic_block(function, "else"))
                 } else {
                     None
@@ -298,36 +319,49 @@ impl<'ctx> Generator<'ctx> {
 
                 // Build the correct conditional branch *first*
                 if let Some(else_bb) = else_bb {
-                    self.builder.build_conditional_branch(
+                    match self.builder.build_conditional_branch(
                         cond_val.into_int_value(),
                         then_bb,
                         else_bb,
-                    );
+                    ) {
+                        Ok(_)=>{}
+                        Err(e)=>return Err(format!("something went wrong during if-else codegen. {}", e))
+                    };
                 } else {
-                    self.builder.build_conditional_branch(
+                    match self.builder.build_conditional_branch(
                         cond_val.into_int_value(),
                         then_bb,
                         merge_bb,
-                    );
+                    ) {
+                        Ok(_)=>{}
+                        Err(e)=>return Err(format!("something went wrong during if-else codegen. {}", e))
+                    };
                 };
 
                 // Then block
                 self.builder.position_at_end(then_bb);
-                let (then_val, _) = if let Some(else_bb) = else_bb {
+                let (then_val, _) = if let Some(_else_bb) = else_bb {
                     self.generate_expression(*if_, function)?
                 }else{
                     self.generate_expression(*if_, function)?;
                     (BasicValueEnum::IntValue(self.context.i32_type().const_zero()), None)
                 };
 
-                self.builder.build_unconditional_branch(merge_bb);
+                match self.builder.build_unconditional_branch(merge_bb){
+                    Ok(_)=>{}
+                    Err(e)=>return Err(format!("something went wrong during `if` codegen. {}", e))
+                };
+
 
                 // Else block (if present)
                 let else_val = if let Some(else_bb) = else_bb {
                     self.builder.position_at_end(else_bb);
-                    let else_expr = else_.unwrap(); //  <--- Add this line
+                    let else_expr = else_.unwrap();
                     let (else_val, _) = self.generate_expression(*else_expr, function)?;
-                    self.builder.build_unconditional_branch(merge_bb);
+                    match self.builder.build_unconditional_branch(merge_bb){
+                        Ok(_)=>{}
+                        Err(e)=>return Err(format!("something went wrong during `if-else` codegen. {}", e))
+                    };
                     else_val
                 } else {
                     BasicValueEnum::IntValue(self.context.i32_type().const_zero()) // Default value
@@ -354,7 +388,7 @@ impl<'ctx> Generator<'ctx> {
 
                 Ok((phi.as_basic_value().into(), None))
             }
-            TypedExpr::BinaryOp(lhs, op, rhs, type_) => {
+            TypedExpr::BinaryOp(lhs, op, rhs, _type_) => {
                 // ... (Get lhs_val and rhs_val)
                 let (lhs_val, _) = self.generate_expression(*(lhs.clone()), function)?;
                 let (rhs_val, _) = self.generate_expression(*(rhs.clone()), function)?;
@@ -464,8 +498,11 @@ impl<'ctx> Generator<'ctx> {
                         let else_block = self.context.append_basic_block(function, "or_else");
                         let merge_block = self.context.append_basic_block(function, "or_merge");
 
-                        self.builder
-                            .build_conditional_branch(lhs_bool, then_block, else_block);
+                        match self.builder
+                            .build_conditional_branch(lhs_bool, then_block, else_block){
+                                Ok(_)=>{}
+                                Err(e)=>return Err(format!("something went wrong during `or` codegen. {}", e))
+                            };
 
                         self.builder.position_at_end(else_block);
                         let (rhs_bool, _) = self.generate_expression(*rhs, function)?;
@@ -508,8 +545,11 @@ impl<'ctx> Generator<'ctx> {
                         let else_block = self.context.append_basic_block(function, "and_else");
                         let merge_block = self.context.append_basic_block(function, "and_merge");
 
-                        self.builder
-                            .build_conditional_branch(lhs_bool, then_block, else_block);
+                        match self.builder
+                            .build_conditional_branch(lhs_bool, then_block, else_block){
+                                Ok(_)=>{}
+                                Err(e)=>return Err(format!("something went wrong during `and` codegen. {}", e))
+                            };
 
                         self.builder.position_at_end(then_block);
                         let (rhs_val, _) = self.generate_expression(*rhs, function)?;
@@ -521,11 +561,19 @@ impl<'ctx> Generator<'ctx> {
                                 self.context.i32_type().const_zero(),
                                 "rhs_bool",
                             )
-                            .unwrap(); // Cast to boolean if necessary
-                        self.builder.build_unconditional_branch(merge_block);
+                            .unwrap();
+
+                        match self.builder.build_unconditional_branch(merge_block){
+                            Ok(_)=>{}
+                            Err(e)=>return Err(format!("something went wrong during `and` codegen. {}", e))
+                        };
 
                         self.builder.position_at_end(else_block);
-                        self.builder.build_unconditional_branch(merge_block); // Short-circuit: if lhs is false, the result is false
+                        
+                        match self.builder.build_unconditional_branch(merge_block){
+                            Ok(_)=>{}
+                            Err(e)=>return Err(format!("something went wrong during `and` codegen. {}", e))
+                        }; // Short-circuit: if lhs is false, the result is false
 
                         self.builder.position_at_end(merge_block);
                         let phi = self
@@ -702,7 +750,7 @@ impl<'ctx> Generator<'ctx> {
                          let mut compiled_args: Vec<BasicValueEnum> = vec![];
                          
                          args.iter().for_each(|arg| {
-                            print!("arg: {:?}", arg);
+                            // print!("arg: {:?}", arg);
                              compiled_args.push(self.generate_expression(*arg.clone(), function).unwrap().0)
                          });
 
@@ -726,16 +774,25 @@ impl<'ctx> Generator<'ctx> {
                 let body_block = self.context.append_basic_block(function, "loop_body");
                 let loop_end_block = self.context.append_basic_block(function, "loop_end");
 
-                self.builder.build_unconditional_branch(loop_start_block);
+                match self.builder.build_unconditional_branch(loop_start_block){
+                    Ok(_)=>{}
+                    Err(e)=>return Err(format!("something went wrong during `while` codegen. {}", e))
+                };
                 self.builder.position_at_end(loop_start_block);
 
                 let cond_value = self.generate_expression(*cond, function)?.0.into_int_value();
 
-                self.builder.build_conditional_branch(cond_value, body_block, loop_end_block);
+                match self.builder.build_conditional_branch(cond_value, body_block, loop_end_block){
+                    Ok(_)=>{}
+                    Err(e)=>return Err(format!("something went wrong during `while` codegen. {}", e))
+                };
 
                 self.builder.position_at_end(body_block);
                 self.generate_expression(*body, function)?;
-                self.builder.build_unconditional_branch(loop_start_block);
+                match self.builder.build_unconditional_branch(loop_start_block){
+                    Ok(_)=>{}
+                    Err(e)=>return Err(format!("something went wrong during `while` codegen. {}", e))
+                };
 
                 self.builder.position_at_end(loop_end_block);
                 Ok((self.context.i32_type().const_zero().into(), None))
@@ -764,9 +821,9 @@ impl<'ctx> Generator<'ctx> {
             TypedExpr::Array(elements, type_) => {
                 let element_type = match type_.as_ref() {
                     Type::Constructor(TypeConstructor {
-                        name,     // always equals array
+                        name: _,     // always equals array
                         generics, // always equals [T],
-                        traits,
+                        traits: _,
                     }) => generics[0].clone(),
                     _ => unreachable!(),
                 };
@@ -793,7 +850,7 @@ impl<'ctx> Generator<'ctx> {
                             .unwrap()
                     };
 
-                    self.builder.build_store(inner_ptr, expr);
+                    self.builder.build_store(inner_ptr, expr).unwrap();
                 });
 
                 Ok((ptr.into(), None))
@@ -856,10 +913,9 @@ impl<'ctx> Generator<'ctx> {
                 .const_int(if *b { 1 } else { 0 }, false)
                 .into()),
             Literal::String(s) => {
-                let string_ptr = unsafe { self.builder.build_global_string_ptr(&s, "str") };
+                let string_ptr = self.builder.build_global_string_ptr(&s, "str");
                 Ok(string_ptr.unwrap().as_pointer_value().as_basic_value_enum())
             }
-            _ => Err("Unsupported literal type".to_string()),
         }
     }
 
@@ -867,8 +923,8 @@ impl<'ctx> Generator<'ctx> {
         match ty.as_ref() {
             Type::Constructor(TypeConstructor {
                 name,
-                generics,
-                traits,
+                generics: _,
+                traits: _,
             }) => match name.as_str() {
                 "int" => self.context.i32_type().into(),
                 "long" => self.context.i64_type().into(),
@@ -876,7 +932,6 @@ impl<'ctx> Generator<'ctx> {
                 "double" => self.context.f64_type().into(),
                 "str" => self
                     .context
-                    .i8_type()
                     .ptr_type(AddressSpace::from(0))
                     .into(),
                 _ => todo!(),

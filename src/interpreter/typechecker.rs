@@ -62,7 +62,7 @@ impl<'a> TypeEnv {
                 let (expression_typed, type_) = self.expr_to_type(expression, substitutions);
                 let type__ = Type::Function(
                     args.iter()
-                        .map(|(arg, type_)| match type_ {
+                        .map(|(_arg, type_)| match type_ {
                             Some(t) => Type::Constructor(TypeConstructor {
                                 name: t.name.to_string(),
                                 generics: t
@@ -189,14 +189,14 @@ impl<'a> TypeEnv {
             }
             Expr::BinaryOp(lhs, op, rhs) => {
                 let (lhs, mut lhs_type) = self.expr_to_type(lhs, substitutions);
-                let (rhs, mut rhs_type) = self.expr_to_type(rhs, substitutions);
+                let (rhs, rhs_type) = self.expr_to_type(rhs, substitutions);
                 unify(lhs_type.clone(), rhs_type.clone(), substitutions);
 
                 match (lhs_type.as_ref(), rhs_type.as_ref()) {
-                    (_, Type::Variable(v @ TypeVariable(..))) => {
-                        rhs_type = lhs_type.clone();
+                    (_, Type::Variable(TypeVariable(..))) => {
+                        // rhs_type = lhs_type.clone();
                     }
-                    (Type::Variable(v @ TypeVariable(..)), _) => {
+                    (Type::Variable(TypeVariable(..)), _) => {
                         lhs_type = rhs_type.clone();
                     }
                     _ => {}

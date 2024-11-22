@@ -1,41 +1,48 @@
-use book::interpreter::TypeEnv;
-use book::lexer::Lexer;
-use book::parser::Parser;
+use book::{
+    interpreter::{translate::Generator, Literal, TypeEnv, TypedNode},
+    lexer::{Lexer, tokens::Token, tokens::TokenType},
+    parser::Parser,
+};
+use std::{
+    collections::HashMap,
+    process
+};
 
-use std::collections::HashMap;
-
-fn main() {
-    let mut parser = Parser::new(
-        Lexer::from_file("examples/first.bk")
-            .unwrap()
-            .map(|t| t.unwrap())
-            .collect::<Vec<_>>()
-            .into_iter()
-            .peekable(),
-        "",
-    );
-    // let mut ast = vec![];
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let source_path = "examples/first.bk";
+    let lexer = Lexer::from_file(source_path)?;
+    let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
+    tokens.push(Token {
+        type_: TokenType::Int(0),
+        pos: 1,
+        line_no: 0,
+        file: source_path.to_string(),
+    }); // HACK: adding a blank expression to the end of the parser. else, the last expression isn't parsed
+    let mut parser = Parser::new(tokens.into_iter().peekable(), source_path);
 
     let mut env = TypeEnv(HashMap::new());
     let mut substitutions = HashMap::new();
 
-    let binding = parser.parse_program().unwrap();
-    println!("ast: {:#?}", binding);
-    let mut node_ = &mut env.node_to_type(&binding, &mut substitutions);
-    book::interpreter::optimise_ast::optimise_node(&mut node_);
-    // println!("ast: {:#?}", node_);
-    println!("\n\n\n\n");
+    let ast = match parser.parse_program(){
+        Ok(ast)=>ast,
+        Err(e)=>{
+            parser.error(e);
+            // eprintln!("parser error encountered. quitting!");
+            process::exit(0);
+        }
+    };
+    let typed_ast = env.node_to_type(&ast, &mut substitutions);
+    // println!("AST (pre-optimization): {:#?}", ast);
 
-    let binding = inkwell::context::Context::create();
-    let mut generator = book::interpreter::translate::Generator::new(&binding, "");
-    generator.generate_program(node_).unwrap();
+    // optimise_ast::optimise_node(&mut ast);
+    //println!("AST (post-optimization): {:#?}", ast);
 
-    println!(
-        "size_of Literal: {:?}",
-        std::mem::size_of::<book::interpreter::Literal>()
-    );
-    println!(
-        "size_of AST: {:?}",
-        std::mem::size_of::<book::interpreter::TypedNode>()
-    );
+    let context = inkwell::context::Context::create();
+    let mut generator = Generator::new(&context, source_path.to_string());
+    generator.generate_program(&typed_ast)?;
+
+    println!("Size of Literal: {:?}", std::mem::size_of::<Literal>());
+    println!("Size of TypedNode: {:?}", std::mem::size_of::<TypedNode>());
+
+    Ok(())
 }

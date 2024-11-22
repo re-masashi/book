@@ -18,15 +18,7 @@ fn tokentype_to_binop(tok: TokenType) -> BinaryOperator {
         TokenType::NotEq => BinaryOperator::NotEqual,
         TokenType::And => BinaryOperator::And,
         TokenType::Or => BinaryOperator::Or,
-        _ => panic!("invalid"),
-    }
-}
-
-fn tokentype_to_unop(tok: TokenType) -> UnaryOperator {
-    match tok {
-        TokenType::Minus => UnaryOperator::Negate,
-        TokenType::Not => UnaryOperator::Not,
-        _ => panic!("invalid"),
+        _ => panic!("invalid binary operator"),
     }
 }
 
@@ -35,42 +27,29 @@ impl<'a> Parser<'_> {
         // println!("do {:?}", self.tokens.peek());
 
         let mut l_value = match self.advance().type_ {
-            TokenType::Do => self.parse_do().unwrap(),
+            TokenType::Do => self.parse_do()?,
             TokenType::Int(i) => Expr::Literal(Literal::Int(i).into()),
             TokenType::Float(f) => Expr::Literal(Literal::Float(f).into()),
             TokenType::True => Expr::Literal(Literal::Boolean(true).into()),
             TokenType::False => Expr::Literal(Literal::Boolean(false).into()),
-            TokenType::String(s) => {
-                Expr::Literal(Literal::String(std::borrow::Cow::Owned(s)).into())
-            }
+            TokenType::String(s) => Expr::Literal(Literal::String(std::borrow::Cow::Owned(s)).into()),
             TokenType::Identifier(i) => Expr::Variable(std::borrow::Cow::Owned(i)),
-            TokenType::LBrack => self.parse_array().unwrap(),
-            TokenType::If => self.parse_if().unwrap(),
-            TokenType::Let => self.parse_let().unwrap(),
+            TokenType::LBrack => self.parse_array()?,
+            TokenType::If => self.parse_if()?, 
+            TokenType::Let => self.parse_let()?,
             TokenType::While => {
-                let cond = self.parse_expression().unwrap();
+                let cond = self.parse_expression()?;
                 match self.advance().type_ {
-                    TokenType::Then => {}
-                    ref x => {
-                        panic!(
-                            "expected `then` after while-loop condition. found `{:?}`",
-                            x
-                        );
-                    }
+                    TokenType::Then => {},
+                    ref x => return Err(format!("expected `then` after while-loop condition. found `{}`", x.to_string())),
                 }
-                let body = self.parse_expression().unwrap();
+                let body = self.parse_expression()?;
                 Expr::While(Box::new(cond), Box::new(body))
             }
-            TokenType::Fn => self.parse_lambda().unwrap(),
-            TokenType::Minus => Expr::UnaryOp(
-                UnaryOperator::Negate,
-                Box::new(self.parse_expression().unwrap()),
-            ),
-            TokenType::Not => Expr::UnaryOp(
-                UnaryOperator::Not,
-                Box::new(self.parse_expression().unwrap()),
-            ),
-            ref x => panic!("found {:?}. line: {}, pos: {}", x, self.line_no, self.pos),
+            TokenType::Fn => self.parse_lambda()?,
+            TokenType::Minus => Expr::UnaryOp(UnaryOperator::Negate, Box::new(self.parse_expression()?)), // Handle potential errors here
+            TokenType::Not => Expr::UnaryOp(UnaryOperator::Not, Box::new(self.parse_expression()?)),
+            ref x => return Err(format!("expected a valid expression. found `{}`.", x.to_string())),
         };
 
         loop {
@@ -78,7 +57,7 @@ impl<'a> Parser<'_> {
                 // array index
                 self.advance(); // eat '['
                 let index = self.parse_expression();
-                l_value = Expr::Index(Box::new(l_value), Box::new(index.unwrap()))
+                l_value = Expr::Index(Box::new(l_value), Box::new(index?))
             } else {
                 break;
             }
@@ -100,7 +79,7 @@ impl<'a> Parser<'_> {
                     if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
                         break;
                     }
-                    args.push(Box::new(self.parse_expression().unwrap()));
+                    args.push(Box::new(self.parse_expression()?));
                     if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                         self.advance(); // Eat ','
                         continue;
@@ -122,8 +101,7 @@ impl<'a> Parser<'_> {
         }
 
         loop {
-            let mut op = tokentype_to_binop(TokenType::Plus);
-            match unwrap_some!(self.tokens.peek()).type_ {
+            let op = match unwrap_some!(self.tokens.peek()).type_ {
                 TokenType::Plus
                 | TokenType::Minus
                 | TokenType::Mul
@@ -135,12 +113,12 @@ impl<'a> Parser<'_> {
                 | TokenType::LessEq
                 | TokenType::NotEq
                 | TokenType::And
-                | TokenType::Or => op = tokentype_to_binop(self.advance().type_),
+                | TokenType::Or => tokentype_to_binop(self.advance().type_),
                 _ => {
                     break;
                 }
-            }
-            let r_value = self.parse_expression().unwrap();
+            };
+            let r_value = self.parse_expression()?;
             l_value = Expr::BinaryOp(Box::new(l_value), op, Box::new(r_value))
         }
 
@@ -153,7 +131,7 @@ impl<'a> Parser<'_> {
         // println!("do {:?}", self.tokens.peek());
         let mut expressions = vec![];
         if unwrap_some!(self.tokens.peek()).type_ == TokenType::End {
-            panic!("cannot have an empty `do` expression");
+            return Err("cannot have an empty `do` expression".to_string());
         }
         loop {
             if unwrap_some!(self.tokens.peek()).type_ == TokenType::End {
@@ -161,7 +139,7 @@ impl<'a> Parser<'_> {
                 break;
             } else {
                 // println!("do-body {:?}", self.tokens.peek());
-                expressions.push(self.parse_expression().unwrap());
+                expressions.push(self.parse_expression()?);
             }
         }
 
@@ -169,36 +147,36 @@ impl<'a> Parser<'_> {
     }
 
     fn parse_array(&mut self) -> Result<Expr<'a>> {
-        let retval = Expr::Literal(Literal::Boolean(false).into());
         let mut args = vec![];
         loop {
             if unwrap_some!(self.tokens.peek()).type_ == TokenType::End {
                 self.advance(); // Eat ','
                 break;
             } else {
-                args.push(self.parse_expression().unwrap());
+                args.push(self.parse_expression()?);
             }
         }
         Ok(Expr::Array(args))
     }
 
     fn parse_if(&mut self) -> Result<Expr<'a>> {
-        let cond = self.parse_expression().unwrap();
+        let cond = self.parse_expression()?;
         match unwrap_some!(self.tokens.peek()).type_ {
             TokenType::Then => {}
             ref x => {
                 return Err(format!(
-                    "Expected `then` after `if` condition. found {:?}. line: {}, pos: {}",
-                    x, self.line_no, self.pos
+                    "Expected `then` after `if` condition. 
+                    found `{}`.",
+                    x.to_string()
                 ))
             }
         }
         self.advance(); // eat 'then'
-        let if_branch = self.parse_expression().unwrap();
+        let if_branch = self.parse_expression()?;
         match unwrap_some!(self.tokens.peek()).type_ {
             TokenType::Else => {
                 self.advance();
-                let else_branch = self.parse_expression().unwrap();
+                let else_branch = self.parse_expression()?;
                 return Ok(Expr::If(
                     Box::new(cond),
                     Box::new(if_branch),
@@ -212,20 +190,20 @@ impl<'a> Parser<'_> {
     fn parse_let(&mut self) -> Result<Expr<'a>> {
         let identifier: std::borrow::Cow<'_, str> = match self.advance().type_ {
             TokenType::Identifier(ref i) => std::borrow::Cow::Owned(i.clone()),
-            _ => return Err("Expected `identifier` after `let` keyword".to_string()),
+            ref x => return Err(format!("Expected `identifier` after `let` keyword. Found `{}`", x.to_string())),
         };
         let type_ = match unwrap_some!(self.tokens.peek()).type_ {
             TokenType::Colon => {
                 self.advance(); // eat ':'
-                Some(self.parse_type().unwrap())
+                Some(self.parse_type()?)
             }
             _ => None,
         };
         match self.advance().type_ {
             TokenType::Assign => {}
-            _ => return Err("expected `=` after `let` ".to_string()),
+            ref x => return Err(format!("expected `=` after `let`. Found `{}`", x.to_string())),
         }
-        let val = self.parse_expression().unwrap();
+        let val = self.parse_expression()?;
         Ok(Expr::Let(identifier, type_, Box::new(val)))
     }
 
@@ -244,12 +222,12 @@ impl<'a> Parser<'_> {
                                 self.advance();
                                 if unwrap_some!(self.tokens.peek()).type_ == TokenType::Colon {
                                     self.advance(); // eat ':'
-                                    args.push((argname_clone, Some(self.parse_type().unwrap())));
+                                    args.push((argname_clone, Some(self.parse_type()?)));
                                 } else {
                                     args.push((argname_clone, None));
                                 }
                             }
-                            _ => return Err("expected identifier".to_string()),
+                            ref x => return Err(format!("expected identifier. found `{}`", x.to_string())),
                         }
                         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                             self.advance(); // Eat ','
@@ -262,11 +240,11 @@ impl<'a> Parser<'_> {
                     }
                 }
             }
-            _ => return Err("expected arguments after function name".to_string()),
+            ref x => return Err(format!("expected arguments after function name. found `{}`", x.to_string())),
         };
         Ok(Expr::Lambda(
             args,
-            Box::new(self.parse_expression().unwrap()),
+            Box::new(self.parse_expression()?),
         ))
     }
 }

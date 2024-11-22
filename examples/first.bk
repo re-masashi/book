@@ -1,10 +1,9 @@
-def count_to_100K(n: int) -> int do
-	if n<1000000 then do
+def count_to_1M(n: int) -> int do
+	if n<1_000_000 then do
 		println(n)
-		count_to_100K(n+1)
+		count_to_1M(n+1)
 	end
 end
 
-count_to_100K(100)
-
-false # a last expr in the end. else the parser crashes
+count_to_1M(1)
+printstr("done!")

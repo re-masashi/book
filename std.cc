@@ -1,9 +1,4 @@
 #include <stdio.h>
-#include <unordered_map>
-#include <string>
-#include <iostream>
-#include <variant>
-#include <memory>
 using namespace std;
 
 extern "C" {
@@ -13,7 +8,9 @@ extern "C" {
         return n; // Return the integer
     }
 
-    int index_arr(int arr[], int i) {
-        return arr[i]; // Return the value at index i in the array arr
+    int printstr(char* str){
+        printf("%s\n", str);
+        return 0;
     }
+
 }

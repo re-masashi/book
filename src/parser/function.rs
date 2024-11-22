@@ -9,8 +9,8 @@ impl<'a> Parser<'_> {
             TokenType::Identifier(ref i) => i.to_string(),
             x => {
                 return Err(format!(
-                    "invalid type without an identifier. found `{:?}`",
-                    x
+                    "invalid type without an identifier. found `{}`",
+                    x.to_string()
                 ))
             }
         };
@@ -26,8 +26,8 @@ impl<'a> Parser<'_> {
                     }
                     ref x => {
                         return Err(format!(
-                            "expected identifier in generic. found {:?}. line: {}, pos: {}",
-                            x, self.line_no, self.pos
+                            "expected identifier in generic. found {}",
+                            x.to_string()
                         ))
                     }
                 }
@@ -54,19 +54,19 @@ impl<'a> Parser<'_> {
         // println!("toks {:#?}", self.tokens);
 
         self.advance(); // eat 'def'
-        let mut name = "".to_string();
+        // let mut name = "".to_string();
         let mut ret_type = None;
         let mut args = vec![];
         // println!("def after def {:?}", self.tokens.peek());
 
         let token = self.advance();
-        match token.type_ {
+        let name = match token.type_ {
             TokenType::Identifier(ref n) => {
-                name = n.clone();
+                n.clone()
                 // println!("found a function named {:?}", n);
             }
-            _ => return Err("expected a function name after 'def'".to_string()),
-        }
+            ref x => return Err(format!("expected a function name after 'def'. found {}", x.to_string())),
+        };
         // println!("def after name {:?}", self.tokens.peek());
 
         let token = self.advance();
@@ -83,12 +83,12 @@ impl<'a> Parser<'_> {
                                 self.advance();
                                 if unwrap_some!(self.tokens.peek()).type_ == TokenType::Colon {
                                     self.advance(); // eat ':'
-                                    args.push((argname_clone, Some(self.parse_type().unwrap())));
+                                    args.push((argname_clone, Some(self.parse_type()?)));
                                 } else {
                                     args.push((argname_clone, None));
                                 }
                             }
-                            _ => return Err("expected identifier".to_string()),
+                            ref x => return Err(format!("expected identifier. found {}", x.to_string())),
                         }
                         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                             self.advance(); // Eat ','
@@ -101,19 +101,19 @@ impl<'a> Parser<'_> {
                     }
                 }
             }
-            _ => return Err("expected arguments after function name".to_string()),
+            ref x => return Err(format!("expected arguments after function name. found {}", x.to_string())),
         };
 
         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Arrow {
             self.advance();
-            ret_type = Some(self.parse_type().unwrap());
+            ret_type = Some(self.parse_type()?);
         };
         // println!("function body {:?}", self.tokens.peek());
 
         Ok(Node::Function(
             std::borrow::Cow::Owned(name),
             args,
-            Box::new(self.parse_expression().unwrap()),
+            Box::new(self.parse_expression()?),
             ret_type,
         ))
     }
