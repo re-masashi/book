@@ -3,10 +3,10 @@ use owo_colors::OwoColorize;
 use crate::interpreter::Expr;
 use crate::lexer::tokens::{Token, TokenType};
 
+use std::fs::read_to_string;
 use std::iter::Peekable;
 use std::marker::PhantomData;
 use std::vec::IntoIter;
-use std::fs::read_to_string;
 
 pub mod expression;
 pub mod function;
@@ -82,11 +82,11 @@ impl Parser<'_> {
     }
 
     pub fn error(&self, message: String) {
-        let file_contents = match read_to_string(&self.file){
-            Ok(f)=>f,
-            Err(e)=>{
+        let file_contents = match read_to_string(&self.file) {
+            Ok(f) => f,
+            Err(e) => {
                 eprintln!("Error: Could not open file: {}. {}", self.file.green(), e);
-                return
+                return;
             }
         };
 
@@ -94,20 +94,15 @@ impl Parser<'_> {
         let line_index = self.line_no as usize - 1;
 
         // More concise and safe way to get lines before/after
-        let pre_line = if line_index > 1{
-                format!(
-                    "{} | {}\n",
-                    line_index,
-                    file_lines[line_index]
-                )
-        }else{
+        let pre_line = if line_index > 1 {
+            format!("{} | {}\n", line_index, file_lines[line_index])
+        } else {
             "".to_string()
         };
         let current_line = file_lines.get(line_index).unwrap_or(&"");
         let post_line = file_lines.get(line_index + 1).unwrap_or(&"");
 
-
-        let pointy_binding = format!("{:~<width$}^", "", width = (self.pos+1) as usize);
+        let pointy_binding = format!("{:~<width$}^", "", width = (self.pos + 1) as usize);
         let pointy = pointy_binding.red();
 
         let error_message = format!(
@@ -119,16 +114,18 @@ impl Parser<'_> {
              {}: {}\n\
              at {}:{} in file `{}`.",
             pre_line.yellow(),
-            self.line_no.green(), current_line.yellow(),
+            self.line_no.green(),
+            current_line.yellow(),
             pointy,
-            (self.line_no + 1).green(), post_line.yellow(),
+            (self.line_no + 1).green(),
+            post_line.yellow(),
             "[Syntax Error]".red(),
             message,
-            self.line_no.green(), self.pos.green(), self.file.green(),
-
+            self.line_no.green(),
+            self.pos.green(),
+            self.file.green(),
         );
 
         eprintln!("{}", error_message);
-
     }
 }

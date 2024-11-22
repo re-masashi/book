@@ -44,6 +44,7 @@ macro_rules! tconst {
 pub enum TypedNode<'a> {
     Function(
         Cow<'a, str>,
+        // Vec<Arc<Type>>, // generics
         Vec<(Cow<'a, str>, Arc<Type>)>,
         Box<TypedExpr<'a>>,
         Arc<Type>,
@@ -52,11 +53,7 @@ pub enum TypedNode<'a> {
     Expr(Box<TypedExpr<'a>>, Arc<Type>),
     Error(String),
     Program(Vec<TypedNode<'a>>),
-    Extern(
-        Cow<'a, str>,
-        Vec<Arc<Type>>,
-        Arc<Type>,
-    )
+    Extern(Cow<'a, str>, Vec<Arc<Type>>, Arc<Type>),
 }
 
 #[derive(Debug, Clone)]
@@ -95,6 +92,7 @@ pub struct TypeEnv(pub HashMap<String, Arc<Type>>);
 pub enum Node<'a> {
     Function(
         Cow<'a, str>,
+        // Vec<String>,
         Vec<(Cow<'a, str>, Option<TypeAnnot>)>,
         Box<Expr<'a>>,
         Option<TypeAnnot>,

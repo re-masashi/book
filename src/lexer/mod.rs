@@ -141,7 +141,7 @@ impl Iterator for Lexer {
         // Integer Literal
         else if current_char.is_numeric() {
             let mut value = current_char.to_string();
-            self.get_next_char_while(&mut value, |c| c.is_numeric() || c=='_');
+            self.get_next_char_while(&mut value, |c| c.is_numeric() || c == '_');
             value = value.replace('_', "").to_string();
 
             // println!("{:?}", current_char);
@@ -189,7 +189,7 @@ impl Iterator for Lexer {
                 self.raw_data.next(); // Eat =
                 token = Ok(TokenType::PlusEq);
             } else {
-                return Some(Err("Unknown token".to_string()))
+                return Some(Err("Unknown token".to_string()));
             }
             // todo: panic?
         }
@@ -311,7 +311,7 @@ impl Iterator for Lexer {
                 token = Ok(TokenType::Not);
             }
         } else {
-            return Some(Err("Unknown token".to_string()))
+            return Some(Err("Unknown token".to_string()));
         }
 
         Some(Ok(Token {

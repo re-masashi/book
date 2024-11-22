@@ -1,12 +1,9 @@
 use book::{
     interpreter::{translate::Generator, Literal, TypeEnv, TypedNode},
-    lexer::{Lexer, tokens::Token, tokens::TokenType},
+    lexer::{tokens::Token, tokens::TokenType, Lexer},
     parser::Parser,
 };
-use std::{
-    collections::HashMap,
-    process
-};
+use std::{collections::HashMap, process};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source_path = "examples/first.bk";
@@ -23,9 +20,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut env = TypeEnv(HashMap::new());
     let mut substitutions = HashMap::new();
 
-    let ast = match parser.parse_program(){
-        Ok(ast)=>ast,
-        Err(e)=>{
+    let ast = match parser.parse_program() {
+        Ok(ast) => ast,
+        Err(e) => {
             parser.error(e);
             // eprintln!("parser error encountered. quitting!");
             process::exit(0);

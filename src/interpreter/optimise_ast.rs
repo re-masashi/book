@@ -249,28 +249,26 @@ pub fn optimise_const_branching_if(ast: &mut TypedExpr) {
     let mut to_swap = false;
 
     match ast {
-        TypedExpr::If(cond, if_, else_, _) => {
-            match cond.as_ref() {
-                TypedExpr::Literal(lit, _) => {
-                    if let Literal::Boolean(true) = lit.as_ref() {
-                        temp = *(if_.clone());
-                    }
-                    if let Literal::Boolean(false) = lit.as_ref() {
-                        if let Some(pat) = else_ {
-                            temp = *(pat.clone());
-                        }
-                    }
-                    to_swap = true;
+        TypedExpr::If(cond, if_, else_, _) => match cond.as_ref() {
+            TypedExpr::Literal(lit, _) => {
+                if let Literal::Boolean(true) = lit.as_ref() {
+                    temp = *(if_.clone());
                 }
-                _ => {
-                    optimise_const_branching_if(cond);
-                    optimise_const_branching_if(if_);
+                if let Literal::Boolean(false) = lit.as_ref() {
                     if let Some(pat) = else_ {
-                        optimise_const_branching_if(pat);
+                        temp = *(pat.clone());
                     }
+                }
+                to_swap = true;
+            }
+            _ => {
+                optimise_const_branching_if(cond);
+                optimise_const_branching_if(if_);
+                if let Some(pat) = else_ {
+                    optimise_const_branching_if(pat);
                 }
             }
-        }
+        },
         TypedExpr::Let(_, expr, _) => {
             // let mut exp = expr.clone();
             optimise_const_branching_if(expr);

@@ -13,3 +13,4 @@ DD/MM/YYYY
 		- Strings work
 		- TCO works
 	- Cleaner parser errors (using OwoColorize)
+	- Formatted using `cargo fmt`

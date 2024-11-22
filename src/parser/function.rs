@@ -54,7 +54,7 @@ impl<'a> Parser<'_> {
         // println!("toks {:#?}", self.tokens);
 
         self.advance(); // eat 'def'
-        // let mut name = "".to_string();
+                        // let mut name = "".to_string();
         let mut ret_type = None;
         let mut args = vec![];
         // println!("def after def {:?}", self.tokens.peek());
@@ -65,7 +65,12 @@ impl<'a> Parser<'_> {
                 n.clone()
                 // println!("found a function named {:?}", n);
             }
-            ref x => return Err(format!("expected a function name after 'def'. found {}", x.to_string())),
+            ref x => {
+                return Err(format!(
+                    "expected a function name after 'def'. found {}",
+                    x.to_string()
+                ))
+            }
         };
         // println!("def after name {:?}", self.tokens.peek());
 
@@ -88,7 +93,9 @@ impl<'a> Parser<'_> {
                                     args.push((argname_clone, None));
                                 }
                             }
-                            ref x => return Err(format!("expected identifier. found {}", x.to_string())),
+                            ref x => {
+                                return Err(format!("expected identifier. found {}", x.to_string()))
+                            }
                         }
                         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                             self.advance(); // Eat ','
@@ -101,7 +108,12 @@ impl<'a> Parser<'_> {
                     }
                 }
             }
-            ref x => return Err(format!("expected arguments after function name. found {}", x.to_string())),
+            ref x => {
+                return Err(format!(
+                    "expected arguments after function name. found {}",
+                    x.to_string()
+                ))
+            }
         };
 
         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Arrow {
