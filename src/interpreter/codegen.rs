@@ -19,8 +19,7 @@ use std::process::Command;
 use std::sync::Arc;
 
 use crate::interpreter::{
-    translate::Generator, BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, TypedNode,
-    UnaryOperator,
+    BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, TypedNode, UnaryOperator,
 };
 use crate::tconst;
 
@@ -388,7 +387,7 @@ impl<'ctx> IRGenerator<'ctx> {
         };
 
         if self.module.get_function(&name).is_some() {
-            Err("Function already declared.".to_string())// maybe allow redeclaration?
+            Err("Function already declared.".to_string()) // maybe allow redeclaration?
         } else {
             // println!("\n");
             let fn_type = ret_type
@@ -436,7 +435,8 @@ impl<'ctx> IRGenerator<'ctx> {
                         .build_return(Some(&returned_val.as_basic_enum(self.context))),
                 },
                 _ => todo!(),
-            }.is_err()
+            }
+            .is_err()
             {
                 return Err("something went wrong during function return generation.".to_string());
             };
@@ -1081,12 +1081,10 @@ impl<'ctx> IRGenerator<'ctx> {
                         ),
                         val_type,
                     )),
-                    _ => {
-                        Err(format!(
-                            "Unsupported unary operator or type: {:?} {:?}",
-                            op, type_
-                        ))
-                    }
+                    _ => Err(format!(
+                        "Unsupported unary operator or type: {:?} {:?}",
+                        op, type_
+                    )),
                 }
             }
             TypedExpr::Array(elements, type_) => {
@@ -1218,11 +1216,7 @@ impl<'ctx> IRGenerator<'ctx> {
                             .unwrap();
                         let field_val = self
                             .builder
-                            .build_load(
-                                ty.as_basic_enum(self.context),
-                                field_ptr,
-                                "field_val",
-                            )
+                            .build_load(ty.as_basic_enum(self.context), field_ptr, "field_val")
                             .unwrap();
                         return Ok((IRValue::Simple(field_val), ty.clone()));
                     }

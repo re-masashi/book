@@ -10,7 +10,7 @@ impl<'a> Parser<'_> {
             x => {
                 return Err(format!(
                     "invalid type without an identifier. found `{}`",
-                    x.to_string()
+                    x
                 ))
             }
         };
@@ -27,7 +27,7 @@ impl<'a> Parser<'_> {
                     ref x => {
                         return Err(format!(
                             "expected identifier in generic. found {}",
-                            x.to_string()
+                            x
                         ))
                     }
                 }
@@ -68,7 +68,7 @@ impl<'a> Parser<'_> {
             ref x => {
                 return Err(format!(
                     "expected a function name after 'def'. found {}",
-                    x.to_string()
+                    x
                 ))
             }
         };
@@ -94,7 +94,7 @@ impl<'a> Parser<'_> {
                                 }
                             }
                             ref x => {
-                                return Err(format!("expected identifier. found {}", x.to_string()))
+                                return Err(format!("expected identifier. found {}", x))
                             }
                         }
                         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
@@ -111,7 +111,7 @@ impl<'a> Parser<'_> {
             ref x => {
                 return Err(format!(
                     "expected arguments after function name. found {}",
-                    x.to_string()
+                    x
                 ))
             }
         };

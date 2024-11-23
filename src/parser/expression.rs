@@ -46,7 +46,7 @@ impl<'a> Parser<'_> {
                     ref x => {
                         return Err(format!(
                             "expected `then` after while-loop condition. found `{}`",
-                            x.to_string()
+                            x
                         ))
                     }
                 }
@@ -61,95 +61,78 @@ impl<'a> Parser<'_> {
             ref x => {
                 return Err(format!(
                     "expected a valid expression. found `{}`.",
-                    x.to_string()
+                    x
                 ))
             }
         };
 
-        loop {
-            if let TokenType::LBrack = unwrap_some!(self.tokens.peek()).type_ {
-                // array index
-                self.advance(); // eat '['
-                let index = self.parse_expression();
-                l_value = Expr::Index(Box::new(l_value), Box::new(index?))
-            } else {
-                break;
-            }
-            if let TokenType::RBrack = unwrap_some!(self.tokens.peek()).type_ {
-                self.advance(); // eat ']'
-            }
+        while let TokenType::LBrack = unwrap_some!(self.tokens.peek()).type_ {
+            // array index
+            self.advance(); // eat '['
+            let index = self.parse_expression();
+            l_value = Expr::Index(Box::new(l_value), Box::new(index?))
         }
+        if let TokenType::RBrack = unwrap_some!(self.tokens.peek()).type_ {
+            self.advance(); // eat ']'
+        }
+
         if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
             self.advance(); // eat trailing ','
         }
 
-        loop {
-            if let TokenType::LParen = unwrap_some!(self.tokens.peek()).type_ {
-                // call
-                self.advance(); // eat '('
-                let mut args = vec![];
-                // let index = self.parse_expression();
-                loop {
-                    if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
-                        break;
-                    }
-                    args.push(Box::new(self.parse_expression()?));
-                    if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
-                        self.advance(); // Eat ','
-                        continue;
-                    }
-                }
-                l_value = Expr::Call(Box::new(l_value), args);
-            } else {
-                break;
-            }
-
-            if let TokenType::RParen = unwrap_some!(self.tokens.peek()).type_ {
-                self.advance(); // eat ')'
-            } else {
-                // println!("{:?}", self.tokens.peek());
-            }
-        }
-        if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
-            self.advance(); // eat trailing ','
-        }
-
-        loop {
-            match unwrap_some!(self.tokens.peek()).type_ {
-                TokenType::Dot => {
-                    self.advance(); // eat '.'
-                    let field =
-                        match self.advance().type_ {
-                            TokenType::Identifier(i) => i,
-                            x => return Err(format!(
-                                "expected identifier after '.' for struct field access. found {}",
-                                x.to_string()
-                            )),
-                        };
-                    l_value = Expr::StructAccess(Box::new(l_value), field.into())
-                }
-                _ => break,
-            }
-        }
-
-        loop {
-            let op = match unwrap_some!(self.tokens.peek()).type_ {
-                TokenType::Plus
-                | TokenType::Minus
-                | TokenType::Mul
-                | TokenType::Div
-                | TokenType::Equal
-                | TokenType::Greater
-                | TokenType::Less
-                | TokenType::GreaterEq
-                | TokenType::LessEq
-                | TokenType::NotEq
-                | TokenType::And
-                | TokenType::Or => tokentype_to_binop(self.advance().type_),
-                _ => {
+        while let TokenType::LParen = unwrap_some!(self.tokens.peek()).type_ {
+            // call
+            self.advance(); // eat '('
+            let mut args = vec![];
+            // let index = self.parse_expression();
+            loop {
+                if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
                     break;
                 }
+                args.push(Box::new(self.parse_expression()?));
+                if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                    self.advance(); // Eat ','
+                    continue;
+                }
+            }
+            l_value = Expr::Call(Box::new(l_value), args);
+            
+            if let TokenType::RParen = unwrap_some!(self.tokens.peek()).type_ {
+                self.advance(); // eat ')'
+            }
+        }
+        
+        if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
+            self.advance(); // eat trailing ','
+        }
+
+        while let TokenType::Dot = unwrap_some!(self.tokens.peek()).type_ {
+            self.advance(); // eat '.'
+            let field = match self.advance().type_ {
+                TokenType::Identifier(i) => i,
+                x => {
+                    return Err(format!(
+                        "expected identifier after '.' for struct field access. found {}",
+                        x
+                    ))
+                }
             };
+            l_value = Expr::StructAccess(Box::new(l_value), field.into())
+        }
+
+        while let TokenType::Plus
+            | TokenType::Minus
+            | TokenType::Mul
+            | TokenType::Div
+            | TokenType::Equal
+            | TokenType::Greater
+            | TokenType::Less
+            | TokenType::GreaterEq
+            | TokenType::LessEq
+            | TokenType::NotEq
+            | TokenType::And
+            | TokenType::Or = unwrap_some!(self.tokens.peek()).type_ {
+            let op = tokentype_to_binop(self.advance().type_);
             let r_value = self.parse_expression()?;
             l_value = Expr::BinaryOp(Box::new(l_value), op, Box::new(r_value))
         }
@@ -199,7 +182,7 @@ impl<'a> Parser<'_> {
                 return Err(format!(
                     "Expected `then` after `if` condition. 
                     found `{}`.",
-                    x.to_string()
+                    x
                 ))
             }
         }
@@ -225,7 +208,7 @@ impl<'a> Parser<'_> {
             ref x => {
                 return Err(format!(
                     "Expected `identifier` after `let` keyword. Found `{}`",
-                    x.to_string()
+                    x
                 ))
             }
         };
@@ -241,7 +224,7 @@ impl<'a> Parser<'_> {
             ref x => {
                 return Err(format!(
                     "expected `=` after `let`. Found `{}`",
-                    x.to_string()
+                    x
                 ))
             }
         }
@@ -272,7 +255,7 @@ impl<'a> Parser<'_> {
                             ref x => {
                                 return Err(format!(
                                     "expected identifier. found `{}`",
-                                    x.to_string()
+                                    x
                                 ))
                             }
                         }
@@ -290,7 +273,7 @@ impl<'a> Parser<'_> {
             ref x => {
                 return Err(format!(
                     "expected arguments after function name. found `{}`",
-                    x.to_string()
+                    x
                 ))
             }
         };

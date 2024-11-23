@@ -1,6 +1,12 @@
+struct Hobby
+	name str
+	time_spent int
+end
+
 struct Person
 	age int
 	name str
+	hobby Hobby
 end
 
 

@@ -2,7 +2,6 @@
 
 pub mod cfg;
 pub mod optimise_ast;
-pub mod translate;
 // pub mod utils;
 pub mod codegen;
 pub mod typechecker;

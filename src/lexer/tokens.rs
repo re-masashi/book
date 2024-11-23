@@ -63,9 +63,9 @@ pub enum TokenType {
     Arrow,
 }
 
-impl TokenType {
-    pub fn to_string(&self) -> String {
-        match self {
+impl std::fmt::Display for TokenType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", match self {
             TokenType::Int(i) => i.to_string(),
             TokenType::Float(f) => f.to_string(),
             TokenType::String(s) => s.to_string(),
@@ -122,7 +122,7 @@ impl TokenType {
             TokenType::Comma => ",".to_string(),
             TokenType::Dot => ".".to_string(),
             TokenType::Arrow => "->".to_string(),
-        }
+        })
     }
 }
 

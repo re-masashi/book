@@ -347,7 +347,7 @@ impl<'a> TypeEnv {
                                     .into();
                                     self.0.insert(arg.to_string(), type_.clone());
                                     type_.clone()
-                                },
+                                }
                                 None => tvar!(self.0.len() + 1),
                             })
                             .collect(),

@@ -36,7 +36,7 @@ impl<'a> Parser<'_> {
             ref x => {
                 return Err(format!(
                     "expected identifier after struct keyword. found `{}`",
-                    x.to_string()
+                    x
                 ))
             }
         };
@@ -54,7 +54,7 @@ impl<'a> Parser<'_> {
                     ref x => {
                         return Err(format!(
                             "expected identifier in generic. found {}",
-                            x.to_string()
+                            x
                         ))
                     }
                 }
@@ -91,7 +91,7 @@ impl<'a> Parser<'_> {
                 ref x => {
                     return Err(format!(
                         "expected identifier in field of struct `{name}`'s definition. found {}",
-                        x.to_string()
+                        x
                     ))
                 }
             }
