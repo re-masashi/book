@@ -56,7 +56,7 @@ impl<'ctx> IRType<'ctx> {
         match &self {
             IRType::Function(..) => todo!(),
             IRType::Struct(..) => context.ptr_type(AddressSpace::from(0)).into(),
-            IRType::Simple(v) => (*v),
+            IRType::Simple(v) => *v,
         }
     }
 }
@@ -85,7 +85,7 @@ impl<'ctx> IRValue<'ctx> {
         match &self {
             IRValue::Function(..) => todo!(),
             IRValue::Struct(..) => todo!(),
-            IRValue::Simple(v) => (*v),
+            IRValue::Simple(v) => *v,
         }
     }
 }
