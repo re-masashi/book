@@ -6,7 +6,7 @@ use book::{
 use std::{collections::HashMap, process};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let source_path = "examples/first.bk";
+    let source_path = "examples/example_struct.bk";
     let lexer = Lexer::from_file(source_path)?;
     let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
     tokens.push(Token {
@@ -29,7 +29,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     let typed_ast = env.node_to_type(&ast, &mut substitutions);
-    // println!("AST (pre-optimization): {:#?}", ast);
+    // println!("AST (pre-opt imization): {:#?}", ast);
 
     // optimise_ast::optimise_node(&mut ast);
     //println!("AST (post-optimization): {:#?}", ast);

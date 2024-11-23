@@ -18,6 +18,8 @@ pub enum TokenType {
     End,
     Then,
     Use,
+    Struct,
+    Enum,
     True,
     False,
 
@@ -82,6 +84,8 @@ impl TokenType {
             TokenType::End => "end".to_string(),
             TokenType::Then => "then".to_string(),
             TokenType::Use => "use".to_string(),
+            TokenType::Struct => "struct".to_string(),
+            TokenType::Enum => "enum".to_string(),
             TokenType::True => "true".to_string(),
             TokenType::False => "false".to_string(),
 

@@ -228,7 +228,7 @@ fn test_typechecker_array_fail() {
     let _ = env.expr_to_type(&ast, &mut HashMap::new());
 }
 
-// todo: if, call, while, unop, array
+// todo: call, while, unop, array
 
 #[test]
 fn test_typechecker_if() {

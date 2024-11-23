@@ -149,7 +149,7 @@ impl<'a> Parser<'_> {
         }
         loop {
             if unwrap_some!(self.tokens.peek()).type_ == TokenType::End {
-                self.advance(); // Eat ','
+                self.advance(); // Eat 'end'
                 break;
             } else {
                 // println!("do-body {:?}", self.tokens.peek());

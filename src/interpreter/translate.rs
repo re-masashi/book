@@ -4,7 +4,7 @@ use inkwell::module::Module;
 use inkwell::targets::{
     CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
 };
-use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
+use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, StructType};
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
@@ -27,6 +27,7 @@ pub struct Generator<'ctx> {
     lambda_counter: i32,
     variables: HashMap<String, (BasicValueEnum<'ctx>, Option<FunctionValue<'ctx>>, Arc<Type>)>,
     file: String,
+    structs: HashMap<String, (StructType<'ctx>, FunctionValue<'ctx>)>
 }
 
 impl<'ctx> Generator<'ctx> {
@@ -40,6 +41,7 @@ impl<'ctx> Generator<'ctx> {
             lambda_counter: 0,
             variables: HashMap::new(),
             file: file,
+            structs: HashMap::new()
         }
     }
 
@@ -61,6 +63,55 @@ impl<'ctx> Generator<'ctx> {
                         TypedNode::Extern(name, args, ret) => {
                             self.generate_extern(name.to_string(), args.to_vec(), ret.clone())?;
                         }
+                        TypedNode::Struct(name, generics, fields) => {
+                            let mut field_types = vec![];
+                            let mut field_metadata_types = vec![];
+                            
+                            for (_name, field_type) in fields {
+                                field_types.push(self.type_to_llvm(field_type.clone()));
+                                field_metadata_types.push(self.type_to_llvm(field_type.clone()).into());
+                            }
+                            
+                            let struct_type = self.context.struct_type(&field_types, false);
+
+                            let function_type = self.context.ptr_type(inkwell::AddressSpace::from(0)).fn_type(&field_metadata_types, false);
+                            let function = self.module.add_function(&("create_".to_string() + &name), function_type, None);
+
+                            let entry_block = self.context.append_basic_block(function, "entry");
+                            self.builder.position_at_end(entry_block);
+
+                            let struct_ptr = self.builder.build_alloca(struct_type.clone(), "struct_ptr").unwrap();
+                            
+                            for (i, (field_name, _field_type)) in fields.iter().enumerate() {
+                                 let field_ptr = unsafe {
+                                     self.builder.build_gep(
+                                         struct_type.clone(),
+                                         struct_ptr,
+                                         &[self.context.i32_type().const_zero(), self.context.i32_type().const_int(i as u64, false)],
+                                         field_name,
+                                     ).unwrap()
+                                 };
+
+                                 let field_value = function.get_nth_param(i as u32).unwrap();
+                                 self.builder.build_store(field_ptr, field_value).unwrap();
+                            }
+
+                            self.builder.build_return(Some(&struct_ptr)).unwrap();
+
+                            self.structs.insert(name.to_string(), (struct_type, function));
+                            self.variables.insert(
+                                name.to_string(), 
+                                (
+                                    struct_ptr.into(), 
+                                    Some(function), 
+                                    Type::Struct(
+                                        name.to_string(), 
+                                        generics.iter().map(|g|g.to_string()).collect(), 
+                                        fields.iter().map(|(name, ty)|(name.to_string(), ty.clone())).collect()
+                                    ).into()
+                                )
+                            );
+                        },
                         _ => unreachable!(),
                     }
                 }
@@ -189,6 +240,7 @@ impl<'ctx> Generator<'ctx> {
 
                     // Verify the function
                     if !function.verify(true) {
+                        self.print_ir();
                         return Err(format!(
                             "something went wrong during function `{name}` generation"
                         ));
@@ -250,6 +302,12 @@ impl<'ctx> Generator<'ctx> {
                         Type::Function(..) => return Ok((*val, *fn_)),
                         _ => {}
                     }
+                    match self.structs.get(&name.to_string()) {
+                        Some(_) => {
+                            return Ok((*val, *fn_))
+                        },
+                        None => {},
+                    }
                     let value = self
                         .builder
                         .build_load(
@@ -261,7 +319,7 @@ impl<'ctx> Generator<'ctx> {
                     Ok((value.into(), *fn_))
                 }
                 None => {
-                    return Err(format!("Undeclared variable: {}", name));
+                    Err(format!("Undeclared variable: {}", name))
                 }
             },
             TypedExpr::Lambda(args, body, return_type_) => {
@@ -983,6 +1041,9 @@ impl<'ctx> Generator<'ctx> {
                     )),
                 }
             }
+            TypedExpr::StructAccess(_structref, _field, _ty)=>{
+                todo!()
+            }
         }
     }
 
@@ -1014,8 +1075,12 @@ impl<'ctx> Generator<'ctx> {
                 "float" => self.context.f32_type().into(),
                 "double" => self.context.f64_type().into(),
                 "str" => self.context.ptr_type(AddressSpace::from(0)).into(),
-                _ => todo!(),
+                x => panic!("found unknown identifier {}", x),
             },
+            Type::Struct(_name, _, _fields) => {
+                // let field_types = fields.iter().map(|(_, ty)| self.type_to_llvm(ty.clone())).collect::<Vec<_>>();
+                self.context.ptr_type(AddressSpace::from(0)).into() //.struct_type(&field_types, false).into()
+            }
             _ => panic!("{:?}", ty),
         }
     }

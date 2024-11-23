@@ -167,6 +167,7 @@ pub fn optimise_constant_fold(ast: &mut TypedExpr) {
             optimise_constant_fold(expression);
             optimise_constant_fold(index);
         }
+        TypedExpr::StructAccess(_, _, _)=>{} // nothing to do
     };
     if to_swap {
         // println!("swapped");
@@ -236,6 +237,7 @@ pub fn optimise_constant_propagation<'a>(
             optimise_constant_propagation(expression, variables);
             optimise_constant_propagation(index, variables);
         }
+        TypedExpr::StructAccess(_, _, _)=>{} // nothing to do
     }
     if to_swap {
         *ast = temp
@@ -307,6 +309,7 @@ pub fn optimise_const_branching_if(ast: &mut TypedExpr) {
             optimise_const_branching_if(expression);
             optimise_const_branching_if(index);
         }
+        TypedExpr::StructAccess(_, _, _)=>{} // nothing to do
     };
     if to_swap {
         // println!("swapped if-else");

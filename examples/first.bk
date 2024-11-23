@@ -1,6 +1,6 @@
 def count_to_1M(n: int) do
 	if n < 1_000_000 then do
-		println(n)
+	#	println(n)
 		count_to_1M(n+1)
 	end
 	0

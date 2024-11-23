@@ -49,7 +49,11 @@ pub enum TypedNode<'a> {
         Box<TypedExpr<'a>>,
         Arc<Type>,
     ),
-    // Struct(usize),
+    Struct(
+        Cow<'a, str>,
+        Vec<Cow<'a, str>>, // generics
+        Vec<(Cow<'a, str>, Arc<Type>)>, // fields
+    ),
     Expr(Box<TypedExpr<'a>>, Arc<Type>),
     Error(String),
     Program(Vec<TypedNode<'a>>),
@@ -84,6 +88,7 @@ pub enum TypedExpr<'a> {
     Array(Vec<TypedExpr<'a>>, Arc<Type>),
     Do(Vec<TypedExpr<'a>>, Arc<Type>),
     Index(Box<TypedExpr<'a>>, Box<TypedExpr<'a>>, Arc<Type>),
+    StructAccess(Box<TypedExpr<'a>>, Cow<'a, str>, Arc<Type>)
 }
 
 pub struct TypeEnv(pub HashMap<String, Arc<Type>>);
@@ -97,7 +102,11 @@ pub enum Node<'a> {
         Box<Expr<'a>>,
         Option<TypeAnnot>,
     ),
-    // Struct(usize),
+    Struct(
+        Cow<'a, str>,
+        Vec<Cow<'a, str>>, // generics
+        Vec<(Cow<'a, str>, TypeAnnot)>, // fields
+    ),
     Expr(Box<Expr<'a>>),
     Error(String),
     Program(Vec<Node<'a>>),
@@ -117,6 +126,7 @@ pub enum Expr<'a> {
     Array(Vec<Expr<'a>>),
     Do(Vec<Expr<'a>>),
     Index(Box<Expr<'a>>, Box<Expr<'a>>), // value, index
+    StructAccess(Box<Expr<'a>>, Cow<'a, str>)
 }
 
 #[derive(Debug)]
@@ -161,6 +171,7 @@ pub enum Type {
     Constructor(TypeConstructor),
     Variable(TypeVariable),
     Function(Vec<Arc<Type>>, Arc<Type>),
+    Struct(String, Vec<String>, Vec<(String, Arc<Type>)>)
 }
 
 impl Type {
@@ -189,6 +200,7 @@ impl Type {
                 args.iter().map(|t| t.substitute(substitutions)).collect(),
                 ret.substitute(substitutions),
             )),
+            Type::Struct(..)=>self.clone().into()
         }
     }
 }
@@ -225,6 +237,7 @@ impl TypeVariable {
                 false
             }
             Type::Function(_, _) => todo!(),
+            Type::Struct(_, _, _)=>todo!()
         }
     }
 }
@@ -273,6 +286,14 @@ fn unify(left: Arc<Type>, right: Arc<Type>, substitutions: &mut HashMap<TypeVari
                 panic!("invalid number of args");
             }
         }
+        (Type::Struct(name, generics, fields), Type::Struct(name2, generics2, fields2))=>{
+            assert!(name==name2);
+            assert!(generics.len()==generics2.len());
+            assert!(fields.len()==fields2.len());
+        }
+        (_, Type::Struct(..))|(Type::Struct(..), _)=>{
+            panic!("invalid");
+        }
         (_, Type::Function(_, _)) => {
             panic!("invalid type");
         }
@@ -309,6 +330,7 @@ pub fn dosumn() {
                 Type::Constructor(c) => c.name.clone(),
                 Type::Variable(_) => format!("T{}", i),
                 Type::Function(_, _) => format!("fn{}", i),
+                Type::Struct(..)=> format!("struct")
             }
         );
     }

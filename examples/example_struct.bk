@@ -1,0 +1,7 @@
+struct Person
+	age int
+end
+
+
+println(1)
+Person(1)
