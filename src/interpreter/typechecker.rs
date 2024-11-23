@@ -347,8 +347,7 @@ impl<'a> TypeEnv {
                                     .into();
                                     self.0.insert(arg.to_string(), type_.clone());
                                     type_.clone()
-                                }
-                                .into(),
+                                },
                                 None => tvar!(self.0.len() + 1),
                             })
                             .collect(),
@@ -442,7 +441,7 @@ impl<'a> TypeEnv {
                 std::borrow::Cow::Borrowed(name),
                 generics.to_vec(),
                 fields
-                    .into_iter()
+                    .iter()
                     .map(|(name, ty)| {
                         (
                             name.clone(),

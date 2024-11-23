@@ -331,7 +331,7 @@ pub fn dosumn() {
                 Type::Constructor(c) => c.name.clone(),
                 Type::Variable(_) => format!("T{}", i),
                 Type::Function(_, _) => format!("fn{}", i),
-                Type::Struct(..) => format!("struct"),
+                Type::Struct(..) => "struct".to_string(),
             }
         );
     }

@@ -56,7 +56,7 @@ impl<'ctx> IRType<'ctx> {
         match &self {
             IRType::Function(..) => todo!(),
             IRType::Struct(..) => context.ptr_type(AddressSpace::from(0)).into(),
-            IRType::Simple(v) => (*v).into(),
+            IRType::Simple(v) => (*v),
         }
     }
 }
@@ -85,7 +85,7 @@ impl<'ctx> IRValue<'ctx> {
         match &self {
             IRValue::Function(..) => todo!(),
             IRValue::Struct(..) => todo!(),
-            IRValue::Simple(v) => (*v).into(),
+            IRValue::Simple(v) => (*v),
         }
     }
 }
@@ -103,7 +103,7 @@ impl<'ctx> IRGenerator<'ctx> {
             structs: HashMap::new(),
             pos: 0,
             line_no: 0,
-            file: file,
+            file,
         }
     }
 
@@ -186,7 +186,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                 .ptr_type(inkwell::AddressSpace::from(0))
                                 .fn_type(&field_metadata_types, false);
                             let function = self.module.add_function(
-                                &("create_".to_string() + &name),
+                                &("create_".to_string() + name),
                                 function_type,
                                 None,
                             );
@@ -208,7 +208,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                 let field_ptr = unsafe {
                                     self.builder
                                         .build_gep(
-                                            struct_type.clone(),
+                                            struct_type,
                                             struct_ptr,
                                             &[
                                                 self.context.i32_type().const_zero(),
@@ -310,7 +310,7 @@ impl<'ctx> IRGenerator<'ctx> {
         println!("emitting {:?}. binding {:?}", exec_name, binding);
 
         assert!(target_machine
-            .write_to_file(&self.module, FileType::Object, &path)
+            .write_to_file(&self.module, FileType::Object, path)
             .is_ok());
         // println!("{:#?}\n====", node);
         Command::new("gcc") // todo: make this better
@@ -343,7 +343,7 @@ impl<'ctx> IRGenerator<'ctx> {
         let arg_types: Vec<(String, IRType<'ctx>)> = args
             .into_iter()
             .enumerate()
-            .map(|(i, type_)| (i.to_string(), self.type_to_llvm(type_.clone()).into())) // false arg names
+            .map(|(i, type_)| (i.to_string(), self.type_to_llvm(type_.clone()))) // false arg names
             .collect();
         let fn_type = ret_type
             .as_basic_enum(self.context)
@@ -388,7 +388,7 @@ impl<'ctx> IRGenerator<'ctx> {
         };
 
         if self.module.get_function(&name).is_some() {
-            return Err("Function already declared.".to_string()); // maybe allow redeclaration?
+            Err("Function already declared.".to_string())// maybe allow redeclaration?
         } else {
             // println!("\n");
             let fn_type = ret_type
@@ -426,7 +426,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
             let (returned_val, returned_type) = self.gen_expression(expr, function)?;
 
-            if !match returned_type {
+            if match returned_type {
                 IRType::Simple(t) => match t {
                     BasicTypeEnum::ArrayType(_) => self
                         .builder
@@ -436,8 +436,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         .build_return(Some(&returned_val.as_basic_enum(self.context))),
                 },
                 _ => todo!(),
-            }
-            .is_ok()
+            }.is_err()
             {
                 return Err("something went wrong during function return generation.".to_string());
             };
@@ -463,12 +462,12 @@ impl<'ctx> IRGenerator<'ctx> {
     ) -> Result<(IRValue<'ctx>, IRType<'ctx>), String> {
         match expression {
             TypedExpr::Let(name, expr, type_) => {
-                let (val, ty) = self.gen_expression(&*expr, function)?;
+                let (val, ty) = self.gen_expression(expr, function)?;
                 let alloca = self
                     .builder
                     .build_alloca(
                         self.type_to_llvm(type_.clone()).as_basic_enum(self.context),
-                        &name,
+                        name,
                     )
                     .unwrap();
                 self.builder
@@ -490,10 +489,10 @@ impl<'ctx> IRGenerator<'ctx> {
                         .build_load(
                             type_.as_basic_enum(self.context),
                             value.as_basic_enum(self.context).into_pointer_value(),
-                            &name,
+                            name,
                         )
                         .unwrap();
-                    Ok((IRValue::Simple(value.into()), type_.clone()))
+                    Ok((IRValue::Simple(value), type_.clone()))
                 }
                 None => Err(format!("Variable '{}' not found", name)),
             },
@@ -522,7 +521,7 @@ impl<'ctx> IRGenerator<'ctx> {
             }
             TypedExpr::Literal(lit, _) => Ok(self.gen_literal(lit)),
             TypedExpr::If(cond, if_, else_, type_) => {
-                let (cond_val, _) = self.gen_expression(&*cond, function)?;
+                let (cond_val, _) = self.gen_expression(cond, function)?;
                 let then_bb = self.context.append_basic_block(function, "then");
                 let merge_bb = self.context.append_basic_block(function, "merge");
 
@@ -568,9 +567,9 @@ impl<'ctx> IRGenerator<'ctx> {
                 // Then block
                 self.builder.position_at_end(then_bb);
                 let (then_val, then_ty) = if let Some(_else_bb) = else_bb {
-                    self.gen_expression(&*if_, function)?
+                    self.gen_expression(if_, function)?
                 } else {
-                    self.gen_expression(&*if_, function)?;
+                    self.gen_expression(if_, function)?;
                     (
                         IRValue::Simple(BasicValueEnum::IntValue(
                             self.context.i32_type().const_zero(),
@@ -590,7 +589,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 let else_val = if let Some(else_bb) = else_bb {
                     self.builder.position_at_end(else_bb);
                     let else_expr = else_.clone().unwrap();
-                    let (else_val, _) = self.gen_expression(&*else_expr, function)?;
+                    let (else_val, _) = self.gen_expression(&else_expr, function)?;
                     match self.builder.build_unconditional_branch(merge_bb) {
                         Ok(_) => {}
                         Err(e) => {
@@ -631,11 +630,11 @@ impl<'ctx> IRGenerator<'ctx> {
                     ]);
                 };
 
-                Ok((IRValue::Simple(phi.as_basic_value().into()), then_ty))
+                Ok((IRValue::Simple(phi.as_basic_value()), then_ty))
             }
             TypedExpr::BinaryOp(lhs, op, rhs, _type_) => {
-                let (lhs_val, lhs_type) = self.gen_expression(&*(lhs.clone()), function)?;
-                let (rhs_val, rhs_type) = self.gen_expression(&*(rhs.clone()), function)?;
+                let (lhs_val, lhs_type) = self.gen_expression(&(lhs.clone()), function)?;
+                let (rhs_val, rhs_type) = self.gen_expression(&(rhs.clone()), function)?;
 
                 let lhs_type = lhs_type.as_basic_enum(self.context);
                 let rhs_type = rhs_type.as_basic_enum(self.context);
@@ -729,7 +728,7 @@ impl<'ctx> IRGenerator<'ctx> {
                     }
 
                     (BinaryOperator::Or, _, _) => {
-                        let (lhs_val, lhs_type) = self.gen_expression(&*lhs, function)?;
+                        let (lhs_val, lhs_type) = self.gen_expression(lhs, function)?;
                         let (lhs_val, lhs_type) = (
                             lhs_val.as_basic_enum(self.context),
                             lhs_type.as_basic_enum(self.context),
@@ -764,7 +763,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
                         self.builder.position_at_end(else_block);
                         let rhs_bool = self
-                            .gen_expression(&*rhs, function)?
+                            .gen_expression(rhs, function)?
                             .0
                             .as_basic_enum(self.context);
                         let rhs_bool = self
@@ -792,7 +791,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
                     (BinaryOperator::And, _, _) => {
                         let lhs_val = self
-                            .gen_expression(&*lhs, function)?
+                            .gen_expression(lhs, function)?
                             .0
                             .as_basic_enum(self.context);
                         let lhs_bool = self
@@ -824,7 +823,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
                         self.builder.position_at_end(then_block);
                         let rhs_val = self
-                            .gen_expression(&*rhs, function)?
+                            .gen_expression(rhs, function)?
                             .0
                             .as_basic_enum(self.context);
                         let rhs_bool = self
@@ -1083,7 +1082,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         val_type,
                     )),
                     _ => {
-                        return Err(format!(
+                        Err(format!(
                             "Unsupported unary operator or type: {:?} {:?}",
                             op, type_
                         ))
@@ -1153,8 +1152,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         IRValue::Simple(
                             self.type_to_llvm(type_.clone())
                                 .as_basic_enum(self.context)
-                                .const_zero()
-                                .into(),
+                                .const_zero(),
                         ),
                         self.type_to_llvm(type_.clone()),
                     )),
@@ -1222,14 +1220,14 @@ impl<'ctx> IRGenerator<'ctx> {
                             .builder
                             .build_load(
                                 ty.as_basic_enum(self.context),
-                                field_ptr.into(),
+                                field_ptr,
                                 "field_val",
                             )
                             .unwrap();
-                        return Ok((IRValue::Simple(field_val.into()), ty.clone()));
+                        return Ok((IRValue::Simple(field_val), ty.clone()));
                     }
                 }
-                return Err("no such field found in the given struct".to_string());
+                Err("no such field found in the given struct".to_string())
             }
         }
     }
@@ -1254,7 +1252,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 IRType::Simple(self.context.bool_type().into()),
             ),
             Literal::String(s) => {
-                let string_ptr = self.builder.build_global_string_ptr(&s, "str");
+                let string_ptr = self.builder.build_global_string_ptr(s, "str");
                 (
                     IRValue::Simple(string_ptr.unwrap().as_pointer_value().as_basic_value_enum()),
                     IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into()),

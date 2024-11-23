@@ -40,7 +40,7 @@ impl<'ctx> Generator<'ctx> {
             builder,
             lambda_counter: 0,
             variables: HashMap::new(),
-            file: file,
+            file,
             structs: HashMap::new(),
         }
     }
@@ -80,7 +80,7 @@ impl<'ctx> Generator<'ctx> {
                                 .ptr_type(inkwell::AddressSpace::from(0))
                                 .fn_type(&field_metadata_types, false);
                             let function = self.module.add_function(
-                                &("create_".to_string() + &name),
+                                &("create_".to_string() + name),
                                 function_type,
                                 None,
                             );
@@ -90,14 +90,14 @@ impl<'ctx> Generator<'ctx> {
 
                             let struct_ptr = self
                                 .builder
-                                .build_alloca(struct_type.clone(), "struct_ptr")
+                                .build_alloca(struct_type, "struct_ptr")
                                 .unwrap();
 
                             for (i, (field_name, _field_type)) in fields.iter().enumerate() {
                                 let field_ptr = unsafe {
                                     self.builder
                                         .build_gep(
-                                            struct_type.clone(),
+                                            struct_type,
                                             struct_ptr,
                                             &[
                                                 self.context.i32_type().const_zero(),
@@ -180,7 +180,7 @@ impl<'ctx> Generator<'ctx> {
         println!("emitting {:?}. binding {:?}", exec_name, binding);
 
         assert!(target_machine
-            .write_to_file(&self.module, FileType::Object, &path)
+            .write_to_file(&self.module, FileType::Object, path)
             .is_ok());
         // println!("{:#?}\n====", node);
         Command::new("gcc") // todo: make this better
@@ -206,17 +206,17 @@ impl<'ctx> Generator<'ctx> {
                 };
 
                 if self.module.get_function(name).is_some() {
-                    return Err("Function already declared.".to_string()); // maybe allow redeclaration?
+                    Err("Function already declared.".to_string())// maybe allow redeclaration?
                 } else {
                     // println!("\n");
                     let fn_type = ret_type.fn_type(arg_types.as_slice(), false);
-                    let function = self.module.add_function(&name, fn_type, None);
+                    let function = self.module.add_function(name, fn_type, None);
 
                     self.variables.insert(
                         name.to_string(),
                         (
                             function.as_global_value().as_basic_value_enum(),
-                            Some(function.clone()),
+                            Some(function),
                             type_.clone(),
                         ),
                     );
@@ -241,13 +241,12 @@ impl<'ctx> Generator<'ctx> {
                     let (returned_val, _) = self.generate_expression(*expr.clone(), function)?;
                     // println!("function {name} built return");
 
-                    if !match returned_val.get_type() {
+                    if match returned_val.get_type() {
                         BasicTypeEnum::ArrayType(_) => {
                             self.builder.build_aggregate_return(&[returned_val])
                         }
                         _ => self.builder.build_return(Some(&returned_val)),
-                    }
-                    .is_ok()
+                    }.is_err()
                     {
                         return Err(
                             "something went wrong during function return generation.".to_string()
@@ -287,7 +286,7 @@ impl<'ctx> Generator<'ctx> {
             name.to_string(),
             (
                 function.as_global_value().as_basic_value_enum(),
-                Some(function.clone()),
+                Some(function),
                 Type::Function(args, ret).into(),
             ),
         );
@@ -314,14 +313,8 @@ impl<'ctx> Generator<'ctx> {
             }
             TypedExpr::Variable(name, _type_) => match self.variables.get(&name.to_string()) {
                 Some((val, fn_, ty)) => {
-                    match ty.as_ref() {
-                        Type::Function(..) => return Ok((*val, *fn_)),
-                        _ => {}
-                    }
-                    match self.structs.get(&name.to_string()) {
-                        Some(_) => return Ok((*val, *fn_)),
-                        None => {}
-                    }
+                    if let Type::Function(..) = ty.as_ref() { return Ok((*val, *fn_)) }
+                    if let Some(_) = self.structs.get(&name.to_string()) { return Ok((*val, *fn_)) }
                     let value = self
                         .builder
                         .build_load(
@@ -330,7 +323,7 @@ impl<'ctx> Generator<'ctx> {
                             &name,
                         )
                         .unwrap();
-                    Ok((value.into(), *fn_))
+                    Ok((value, *fn_))
                 }
                 None => Err(format!("Undeclared variable: {}", name)),
             },
@@ -359,13 +352,12 @@ impl<'ctx> Generator<'ctx> {
 
                 let (returned_val, _) = self.generate_expression(*body, function)?;
 
-                if !match returned_val.get_type() {
+                if match returned_val.get_type() {
                     BasicTypeEnum::ArrayType(_) => {
                         self.builder.build_aggregate_return(&[returned_val])
                     }
                     _ => self.builder.build_return(Some(&returned_val)),
-                }
-                .is_ok()
+                }.is_err()
                 {
                     return Err("something went wrong during lambda generation.".to_string());
                 };
@@ -377,7 +369,7 @@ impl<'ctx> Generator<'ctx> {
 
                 Ok((function.as_global_value().as_basic_value_enum(), None)) // Return the function value
             }
-            TypedExpr::Literal(lit, _) => Ok((self.generate_literal(&lit.as_ref())?, None)),
+            TypedExpr::Literal(lit, _) => Ok((self.generate_literal(lit.as_ref())?, None)),
             TypedExpr::If(cond, if_, else_, type_) => {
                 let (cond_val, _) = self.generate_expression(*cond, function)?;
                 let then_bb = self.context.append_basic_block(function, "then");
@@ -482,7 +474,7 @@ impl<'ctx> Generator<'ctx> {
                     // pre_if_bb is correct here
                 };
 
-                Ok((phi.as_basic_value().into(), None))
+                Ok((phi.as_basic_value(), None))
             }
             TypedExpr::BinaryOp(lhs, op, rhs, _type_) => {
                 let (lhs_val, _) = self.generate_expression(*(lhs.clone()), function)?;
@@ -957,7 +949,7 @@ impl<'ctx> Generator<'ctx> {
                         None,
                     )),
                     _ => {
-                        return Err(format!(
+                        Err(format!(
                             "Unsupported unary operator or type: {:?} {:?}",
                             op, type_
                         ))
@@ -1016,8 +1008,8 @@ impl<'ctx> Generator<'ctx> {
                 });
 
                 match exprs.last() {
-                    None => Ok((self.type_to_llvm(type_).const_zero().into(), None)),
-                    Some(v) => Ok((v.clone(), None)),
+                    None => Ok((self.type_to_llvm(type_).const_zero(), None)),
+                    Some(v) => Ok((*v, None)),
                 }
             }
             TypedExpr::Index(array, index, type_) => {
@@ -1067,7 +1059,7 @@ impl<'ctx> Generator<'ctx> {
                 .const_int(if *b { 1 } else { 0 }, false)
                 .into()),
             Literal::String(s) => {
-                let string_ptr = self.builder.build_global_string_ptr(&s, "str");
+                let string_ptr = self.builder.build_global_string_ptr(s, "str");
                 Ok(string_ptr.unwrap().as_pointer_value().as_basic_value_enum())
             }
         }
