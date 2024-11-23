@@ -176,7 +176,7 @@ impl<'a> TypeEnv {
                     Type::Constructor(..) => {
                         panic!("invalid function");
                     }
-                    Type::Struct(..)=>{
+                    Type::Struct(..) => {
                         todo!()
                     }
                 }
@@ -296,14 +296,14 @@ impl<'a> TypeEnv {
                     tvar!(self.0.len()),
                 );
             }
-            Expr::StructAccess(struct_, field)=>{
+            Expr::StructAccess(struct_, field) => {
                 return (
                     TypedExpr::StructAccess(
-                        Box::new(self.expr_to_type(struct_, substitutions).0), 
-                        std::borrow::Cow::Borrowed(field), 
-                        tvar!(self.0.len())
-                    ), 
-                    tvar!(self.0.len())
+                        Box::new(self.expr_to_type(struct_, substitutions).0),
+                        std::borrow::Cow::Borrowed(field),
+                        tvar!(self.0.len()),
+                    ),
+                    tvar!(self.0.len()),
                 )
             }
         };
@@ -438,11 +438,12 @@ impl<'a> TypeEnv {
                     .map(|node| self.node_to_type(node, substitutions))
                     .collect(),
             ),
-            Node::Struct(name, generics, fields)=>{
-                TypedNode::Struct(
-                    std::borrow::Cow::Borrowed(name), 
-                    generics.to_vec(), 
-                    fields.into_iter().map(|(name, ty)|{
+            Node::Struct(name, generics, fields) => TypedNode::Struct(
+                std::borrow::Cow::Borrowed(name),
+                generics.to_vec(),
+                fields
+                    .into_iter()
+                    .map(|(name, ty)| {
                         (
                             name.clone(),
                             Type::Constructor(TypeConstructor {
@@ -454,11 +455,12 @@ impl<'a> TypeEnv {
                                     .map(|generic| tconst!(generic))
                                     .collect(),
                                 traits: vec![],
-                            }).into()
+                            })
+                            .into(),
                         )
-                    }).collect::<Vec<(_, Arc<Type>)>>()
-                )
-            }
+                    })
+                    .collect::<Vec<(_, Arc<Type>)>>(),
+            ),
         };
         Self::substitute_type_vars_in_typed_node(typed_node, substitutions)
     }
@@ -497,7 +499,7 @@ impl<'a> TypeEnv {
                 })
                 .into()
             }
-            Type::Struct(..)=>ty
+            Type::Struct(..) => ty,
         }
     }
 
@@ -628,9 +630,7 @@ impl<'a> TypeEnv {
 
                 TypedExpr::Index(new_arr, new_idx, new_ty)
             }
-            TypedExpr::StructAccess(_,_, _)=>{
-                typed_expr
-            }
+            TypedExpr::StructAccess(_, _, _) => typed_expr,
         }
     }
 
@@ -688,6 +688,6 @@ fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
         TypedExpr::Array(_, ty) => ty.clone(),
         TypedExpr::Do(_, ty) => ty.clone(),
         TypedExpr::Index(_, _, ty) => ty.clone(),
-        TypedExpr::StructAccess(_, _, ty) => ty.clone()
+        TypedExpr::StructAccess(_, _, ty) => ty.clone(),
     }
 }

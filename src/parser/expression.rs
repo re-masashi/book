@@ -118,13 +118,17 @@ impl<'a> Parser<'_> {
             match unwrap_some!(self.tokens.peek()).type_ {
                 TokenType::Dot => {
                     self.advance(); // eat '.'
-                    let field = match self.advance().type_ {
-                        TokenType::Identifier(i)=>i,
-                        x=>return Err(format!("expected identifier after '.' for struct field access. found {}", x.to_string()))
-                    };
+                    let field =
+                        match self.advance().type_ {
+                            TokenType::Identifier(i) => i,
+                            x => return Err(format!(
+                                "expected identifier after '.' for struct field access. found {}",
+                                x.to_string()
+                            )),
+                        };
                     l_value = Expr::StructAccess(Box::new(l_value), field.into())
-                },
-                _=>break
+                }
+                _ => break,
             }
         }
 

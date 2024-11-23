@@ -33,7 +33,12 @@ impl<'a> Parser<'_> {
 
         let name = match self.advance().type_ {
             TokenType::Identifier(i) => i.to_string(),
-            ref x => return Err(format!("expected identifier after struct keyword. found `{}`", x.to_string())),
+            ref x => {
+                return Err(format!(
+                    "expected identifier after struct keyword. found `{}`",
+                    x.to_string()
+                ))
+            }
         };
 
         let mut generics = vec![];
@@ -74,16 +79,21 @@ impl<'a> Parser<'_> {
                 TokenType::Identifier(ref i) => {
                     let field_name = i.clone();
                     self.advance(); // eat 'identifier'
-                    // match unwrap_some!(self.tokens.peek()).type_ {
-                    //     TokenType::Colon=>{}
-                    //     _=>return Err()
-                    // }
+                                    // match unwrap_some!(self.tokens.peek()).type_ {
+                                    //     TokenType::Colon=>{}
+                                    //     _=>return Err()
+                                    // }
 
                     let field_type = self.parse_type()?;
 
                     fields.push((std::borrow::Cow::Owned(field_name), field_type));
                 }
-                ref x=>return Err(format!("expected identifier in field of struct `{name}`'s definition. found {}", x.to_string()))
+                ref x => {
+                    return Err(format!(
+                        "expected identifier in field of struct `{name}`'s definition. found {}",
+                        x.to_string()
+                    ))
+                }
             }
         }
 
