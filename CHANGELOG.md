@@ -14,3 +14,8 @@ DD/MM/YYYY
 		- TCO works
 	- Cleaner parser errors (using OwoColorize)
 	- Formatted using `cargo fmt`
+
+## 23/11/2024
+	- Added support for struct codegen
+	- REDID THE ENTIRETY OF THE PREVIOUS CODEGEN!
+	- STRUCTS WORK FULLY (EXCEPT SELF-REFERENCING STRUCTS)!

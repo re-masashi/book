@@ -5,6 +5,7 @@ pub mod optimise_ast;
 pub mod translate;
 // pub mod utils;
 pub mod typechecker;
+pub mod codegen;
 
 #[cfg(test)]
 pub mod tests;

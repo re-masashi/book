@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <gc.h>
+
 using namespace std;
 
 extern "C" {
@@ -8,9 +10,17 @@ extern "C" {
         return n; // Return the integer
     }
 
-    int printstr(char* str){
+    int printstrln(char* str){
         printf("%s\n", str);
         return 0;
     }
 
+    int printstr(char* str){
+        printf("%s", str);
+        return 0;
+    }
+
+    void* my_malloc(int size) {
+        return GC_malloc(size);
+    }
 }

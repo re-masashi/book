@@ -1,7 +1,12 @@
 struct Person
 	age int
+	name str
 end
 
 
-println(1)
-Person(1)
+let x: Person = Person(17, "masashi 
+")
+printstr("his name is: ")
+printstr(x.name)
+printstr("age of the person is: ")
+println(x.age)

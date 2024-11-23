@@ -1,5 +1,5 @@
 use book::{
-    interpreter::{translate::Generator, Literal, TypeEnv, TypedNode},
+    interpreter::{codegen::IRGenerator, TypeEnv},
     lexer::{tokens::Token, tokens::TokenType, Lexer},
     parser::Parser,
 };
@@ -35,11 +35,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     //println!("AST (post-optimization): {:#?}", ast);
 
     let context = inkwell::context::Context::create();
-    let mut generator = Generator::new(&context, source_path.to_string());
-    generator.generate_program(&typed_ast)?;
+    let mut generator = IRGenerator::new(&context, source_path.to_string());
+    generator.gen_program(&typed_ast)?;
 
-    println!("Size of Literal: {:?}", std::mem::size_of::<Literal>());
-    println!("Size of TypedNode: {:?}", std::mem::size_of::<TypedNode>());
+    // println!("Size of Literal: {:?}", std::mem::size_of::<Literal>());
+    // println!("Size of TypedNode: {:?}", std::mem::size_of::<TypedNode>());
 
     Ok(())
 }

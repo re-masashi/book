@@ -56,7 +56,7 @@ impl<'a> Parser<'_> {
             TokenType::Fn => self.parse_lambda()?,
             TokenType::Minus => {
                 Expr::UnaryOp(UnaryOperator::Negate, Box::new(self.parse_expression()?))
-            } // Handle potential errors here
+            }
             TokenType::Not => Expr::UnaryOp(UnaryOperator::Not, Box::new(self.parse_expression()?)),
             ref x => {
                 return Err(format!(
@@ -112,6 +112,20 @@ impl<'a> Parser<'_> {
         }
         if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
             self.advance(); // eat trailing ','
+        }
+
+        loop {
+            match unwrap_some!(self.tokens.peek()).type_ {
+                TokenType::Dot => {
+                    self.advance(); // eat '.'
+                    let field = match self.advance().type_ {
+                        TokenType::Identifier(i)=>i,
+                        x=>return Err(format!("expected identifier after '.' for struct field access. found {}", x.to_string()))
+                    };
+                    l_value = Expr::StructAccess(Box::new(l_value), field.into())
+                },
+                _=>break
+            }
         }
 
         loop {
