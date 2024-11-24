@@ -460,6 +460,45 @@ impl<'a> TypeEnv {
                     })
                     .collect::<Vec<(_, Arc<Type>)>>(),
             ),
+            Node::Extern(name, args, ret_type) => {
+                let annoted_type: Arc<Type> = Type::Constructor(TypeConstructor {
+                    name: ret_type.name.to_string(),
+                    generics: ret_type
+                        .generics
+                        .clone()
+                        .into_iter()
+                        .map(|generic| tconst!(generic))
+                        .collect(),
+                    traits: vec![],
+                }).into();
+                let mut typed_args = vec![];
+                let type_ = Type::Function(
+                    args.iter()
+                        .map(|argtype| {
+                            let type_: Arc<_> = Type::Constructor(TypeConstructor {
+                                name: argtype.name.to_string(),
+                                generics: argtype
+                                    .generics
+                                    .clone()
+                                    .into_iter()
+                                    .map(|generic| tconst!(generic))
+                                    .collect(),
+                                traits: vec![],
+                            })
+                            .into();
+                            typed_args.push(type_.clone());
+                            type_.clone()
+                        })
+                        .collect(),
+                    annoted_type.clone(),
+                );
+                self.0.insert(name.to_string(), type_.into());
+                TypedNode::Extern(
+                    name.clone(),
+                    typed_args,
+                    annoted_type.clone()
+                )
+            },
         };
         Self::substitute_type_vars_in_typed_node(typed_node, substitutions)
     }

@@ -130,6 +130,7 @@ impl Iterator for Lexer {
                 "do" => token = Ok(TokenType::Do),
                 "def" => token = Ok(TokenType::Def),
                 "end" => token = Ok(TokenType::End),
+                "extern" => token = Ok(TokenType::Extern),
                 "struct" => token = Ok(TokenType::Struct),
                 "enum" => token = Ok(TokenType::Enum),
                 "true" => token = Ok(TokenType::True),

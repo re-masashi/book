@@ -110,6 +110,7 @@ pub enum Node<'a> {
     Expr(Box<Expr<'a>>),
     Error(String),
     Program(Vec<Node<'a>>),
+    Extern(Cow<'a, str>, Vec<TypeAnnot>, TypeAnnot),
 }
 
 #[derive(Debug, Clone)]

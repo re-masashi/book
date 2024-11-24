@@ -23,6 +23,7 @@ impl<'a> Parser<'_> {
         match unwrap_some!(self.tokens.peek()).type_ {
             TokenType::Def => self.parse_function(),
             TokenType::Struct => self.parse_struct(),
+            TokenType::Extern => self.parse_extern(),
             _ => Ok(Node::Expr(Box::new(self.parse_expression()?))),
         }
         .clone()
@@ -98,5 +99,71 @@ impl<'a> Parser<'_> {
         }
 
         Ok(Node::Struct(name.into(), generics, fields))
+    }
+
+    pub fn parse_extern(&mut self) -> Result<Node<'a>> {
+
+        self.advance(); // eat 'extern'
+        
+        let mut args = vec![];
+        
+        let token = self.advance();
+        let name = match token.type_ {
+            TokenType::Identifier(ref n) => {
+                n.clone()
+            }
+            ref x => {
+                return Err(format!(
+                    "expected a function name after 'extern'. found {}",
+                    x
+                ))
+            }
+        };
+        // println!("def after name {:?}", self.tokens.peek());
+
+        let token = self.advance();
+        match token.type_ {
+            TokenType::LParen => {
+                if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                    self.advance(); // Eat ')'
+                } else {
+                    loop {
+                        args.push(self.parse_type()?);
+                        if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                            self.advance(); // Eat ','
+                            if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                                self.advance(); // eat ')'
+                                break;
+                            }
+                            continue;
+                        }else {
+                            return Err(format!("Expected ',' after type in `extern` definition. found {}", unwrap_some!(self.tokens.peek()).type_))
+                        }
+                    }
+                    if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                        self.advance(); // eat trailing ','
+                    }
+                }
+            }
+            ref x => {
+                return Err(format!(
+                    "expected arguments after function name. found {}",
+                    x
+                ))
+            }
+        };
+
+        let ret_type = if unwrap_some!(self.tokens.peek()).type_ == TokenType::Arrow {
+            self.advance();
+            self.parse_type()?
+        }else{
+            return Err(format!("Expected an arrow followed by a return type after extern definition. found {}", unwrap_some!(self.tokens.peek()).type_))
+        };
+
+        Ok(Node::Extern(
+            std::borrow::Cow::Owned(name),
+            args,
+            ret_type,
+        ))
     }
 }
