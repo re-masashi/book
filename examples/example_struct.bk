@@ -6,7 +6,6 @@ end
 struct Person
 	age int
 	name str
-	hobby Hobby
 end
 
 

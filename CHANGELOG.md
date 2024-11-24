@@ -19,3 +19,6 @@ DD/MM/YYYY
 	- Added support for struct codegen
 	- REDID THE ENTIRETY OF THE PREVIOUS CODEGEN!
 	- STRUCTS WORK FULLY (EXCEPT SELF-REFERENCING STRUCTS)!
+
+## 24/11/2024
+	- Changed usage (now it's `book <filename>`)

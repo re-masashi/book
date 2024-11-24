@@ -157,7 +157,7 @@ impl<'a> TypeEnv {
                             value_type.clone(),
                         )
                     }
-                    Type::Function(_fn_args, _ret_type) => {
+                    Type::Function(_fn_args, ret_type) => {
                         let type_ = Type::Function(
                             args.iter().map(|_arg| tvar!(self.0.len() + 1)).collect(),
                             tvar!(self.0.len() + 1),
@@ -170,7 +170,7 @@ impl<'a> TypeEnv {
 
                         (
                             TypedExpr::Call(Box::new(value_), new_args, tvar!(self.0.len() + 1)),
-                            tvar!(self.0.len()),
+                            ret_type.clone(),
                         )
                     }
                     Type::Constructor(..) => {
