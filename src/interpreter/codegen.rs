@@ -367,21 +367,18 @@ impl<'ctx> IRGenerator<'ctx> {
         type_: Arc<Type>,
     ) -> Result<(IRValue<'ctx>, IRType<'ctx>), String> {
         let (arg_meta_types, arg_types, ret_type) = match type_.as_ref().clone() {
-            Type::Function(_arg_types, ret_type) => match type_.as_ref().clone() {
-                Type::Function(_arg_types, ret_type) => {
-                    let arg_meta_types: Vec<BasicMetadataTypeEnum<'ctx>> = args
-                        .iter()
-                        .map(|(_name, type_)| {
-                            self.type_to_llvm(type_.clone()).as_meta_enum(self.context)
-                        })
-                        .collect();
-                    let arg_types: Vec<(String, IRType<'ctx>)> = args
-                        .iter()
-                        .map(|(name, type_)| (name.to_string(), self.type_to_llvm(type_.clone())))
-                        .collect();
-                    (arg_meta_types, arg_types, self.type_to_llvm(ret_type))
-                }
-                _ => todo!(),
+            Type::Function(_arg_types, ret_type) => {
+                let arg_meta_types: Vec<BasicMetadataTypeEnum<'ctx>> = args
+                    .iter()
+                    .map(|(_name, type_)| {
+                        self.type_to_llvm(type_.clone()).as_meta_enum(self.context)
+                    })
+                    .collect();
+                let arg_types: Vec<(String, IRType<'ctx>)> = args
+                    .iter()
+                    .map(|(name, type_)| (name.to_string(), self.type_to_llvm(type_.clone())))
+                    .collect();
+                (arg_meta_types, arg_types, self.type_to_llvm(ret_type))
             },
             _ => unreachable!(),
         };
