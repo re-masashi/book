@@ -4,5 +4,13 @@ def count_to_1M(n: int) -> int do
 	end
 end
 
+def identity(n) do
+	n
+end
+
+identity(1)
+identity(1.0)
+identity("aaa")
+
 count_to_1M(1)
 printstr("done!")

@@ -40,6 +40,64 @@ macro_rules! tconst {
     ($name:expr) => { tconst!($name,) };
 }
 
+#[macro_export]
+macro_rules! t_int {
+    () => {
+        Arc::new(Type::Constructor(TypeConstructor {
+            name: "int".to_string(),
+            generics: vec![],
+            traits: vec![
+                "Number".to_string(),
+                "Printable".to_string(),
+                "Simple".to_string()
+            ],
+        }))
+    };
+}
+
+#[macro_export]
+macro_rules! t_float {
+    () => {
+        Arc::new(Type::Constructor(TypeConstructor {
+            name: "float".to_string(),
+            generics: vec![],
+            traits: vec![
+                "Number".to_string(),
+                "Printable".to_string(),
+                "Simple".to_string()
+            ],
+        }))
+    };
+}
+
+#[macro_export]
+macro_rules! t_str {
+    () => {
+        Arc::new(Type::Constructor(TypeConstructor {
+            name: "str".to_string(),
+            generics: vec![],
+            traits: vec![
+                "Printable".to_string(),
+                "Simple".to_string()
+            ],
+        }))
+    };
+}
+
+#[macro_export]
+macro_rules! t_bool {
+    () => {
+        Arc::new(Type::Constructor(TypeConstructor {
+            name: "bool".to_string(),
+            generics: vec![],
+            traits: vec![
+                "Printable".to_string(),
+                "Simple".to_string()
+            ],
+        }))
+    };
+}
+
 #[derive(Debug, Clone)]
 pub enum TypedNode<'a> {
     Function(
@@ -171,6 +229,7 @@ pub struct TypeAnnot {
 pub enum Type {
     Constructor(TypeConstructor),
     Variable(TypeVariable),
+    Trait(String), // a specified trait bound
     Function(Vec<Arc<Type>>, Arc<Type>),
     Struct(String, Vec<String>, Vec<(String, Arc<Type>)>),
 }
@@ -202,6 +261,7 @@ impl Type {
                 ret.substitute(substitutions),
             )),
             Type::Struct(..) => self.clone().into(),
+            Type::Trait(_) => self.clone().into()
         }
     }
 }
@@ -239,6 +299,7 @@ impl TypeVariable {
             }
             Type::Function(_, _) => todo!(),
             Type::Struct(_, _, _) => todo!(),
+            Type::Trait(_) => todo!()
         }
     }
 }
@@ -301,6 +362,7 @@ fn unify(left: Arc<Type>, right: Arc<Type>, substitutions: &mut HashMap<TypeVari
         (Type::Function(_, _), _) => {
             panic!("invalid type");
         }
+        _=>todo!()
     }
 }
 
@@ -332,6 +394,7 @@ pub fn dosumn() {
                 Type::Variable(_) => format!("T{}", i),
                 Type::Function(_, _) => format!("fn{}", i),
                 Type::Struct(..) => "struct".to_string(),
+                Type::Trait(t)=>format!("Trait {t}")
             }
         );
     }

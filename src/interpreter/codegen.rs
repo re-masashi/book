@@ -22,7 +22,13 @@ use crate::interpreter::{
     BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, TypedNode, UnaryOperator,
     TypeEnv
 };
-use crate::tconst;
+use crate::{
+    tconst,
+    t_int,
+    t_float,
+    t_bool,
+    t_str,
+};
 
 pub struct IRGenerator<'ctx> {
     context: &'ctx Context,
@@ -150,8 +156,8 @@ impl<'ctx> IRGenerator<'ctx> {
 
     pub fn gen_program(&mut self, node: &TypedNode<'ctx>) -> Result<(), String> {
         self.declare_gc_functions();
-        self.gen_extern("println".to_string(), vec![tconst!("int")], tconst!("int"))?;
-        self.gen_extern("printstr".to_string(), vec![tconst!("str")], tconst!("int"))?;
+        self.gen_extern("println".to_string(), vec![t_int!()], t_int!())?;
+        self.gen_extern("printstr".to_string(), vec![t_str!()], t_str!())?;
 
         match node {
             TypedNode::Program(nodes) => {
@@ -402,6 +408,17 @@ impl<'ctx> IRGenerator<'ctx> {
                     }
                 }
                 if is_poly {
+                    self.variables.insert(
+                        name.to_string(),
+                        (
+                            IRValue::PolyMorph(
+                                name.to_string(),
+                                Box::new(expr.clone()),
+                                args.clone(),
+                                ret_type.clone()
+                            ),
+                            IRType::PolyMorph                        ),
+                    );
                     // self.polymorphic_functions.insert()
                     return Ok((
                         IRValue::PolyMorph(
@@ -485,6 +502,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
             // Verify the function
             if !function.verify(true) {
+                self.print_ir();
                 return Err(format!(
                     "something went wrong during function `{name}` generation"
                 ));
@@ -525,6 +543,9 @@ impl<'ctx> IRGenerator<'ctx> {
                 Some((value, type_)) => {
                     if let IRType::Function(..) = type_ {
                         return Ok((value.clone(), type_.clone()));
+                    }
+                    if let IRType::PolyMorph = type_ {
+                        return Ok((value.clone(), type_.clone()))
                     }
                     let value = self
                         .builder
@@ -1066,24 +1087,104 @@ impl<'ctx> IRGenerator<'ctx> {
                 };
                 Ok((IRValue::Simple(result), IRType::Simple(lhs_type)))
             }
-            TypedExpr::Call(callee, args, _type_) => {
+            TypedExpr::Call(callee, args, type_) => {
                 match self.gen_expression(callee, function)? {
                     (IRValue::PolyMorph(name, expr, polyargs, ret), IRType::PolyMorph)=>{
-                        let mut poly_arg_types = polyargs.clone();
+                        let mut poly_args = vec![];
+                        let arg_exprs = args;
+                        let continuation_bb = function.get_last_basic_block().unwrap();
+
                         if args.len() != polyargs.len() {
                             return Err("Invalid number of args".to_string())
                         }
-                        let typeenv = TypeEnv(HashMap::new());
+                        let mut substitutions = HashMap::new();
+
                         for (i, arg) in args.iter().enumerate() {
-                            poly_arg_types[i] = (poly_arg_types[i].0.clone(), get_type_from_typed_expr(arg));
+                            let ty = get_type_from_typed_expr(arg);
+                            match polyargs[i].1.as_ref() {
+                                Type::Variable(v) => {
+                                    substitutions.insert(v.clone(), ty.clone());
+                                },
+                                _=>{},
+                            }
+                            poly_args.push((polyargs[i].0.clone().into(), ty));
                         }
+
+                        let new_name = format!("{name}${}$", self.lambda_counter);
+                        self.lambda_counter+=1;
+
+                        let TypedNode::Function(
+                            _,
+                            args,
+                            expr,
+                            ret
+                        ) = TypeEnv::substitute_type_vars_in_typed_node(
+                            TypedNode::Function(
+                                new_name.clone().into(),
+                                poly_args,
+                                expr,
+                                type_.clone(),
+                            ),
+                            &substitutions
+                        ) else {unreachable!()};
+
+                        let (IRValue::Function(
+                            function_to_call,
+                            _,
+                            _
+                        ), fn_type) = self.gen_function(
+                            new_name.clone().into(),
+                            args.iter()
+                                .map(|(x, t)| (x.to_string(), t.clone()))
+                                .collect(),
+                            &expr,
+                            Type::Function(
+                                args.iter()
+                                    .map(|(_, t)| (t.clone()))
+                                    .collect(),
+                                ret.clone()
+                            ).into()
+                        )? else {unreachable!()};
+
+                        self.builder.position_at_end(continuation_bb);
+
+                        // todo!()
                         // type check to see if all expressions are valid
-                        todo!()
+                        // i'll add it later. let me just make a prototype.
+
                         /*
                         Then, we look up all the instances of this function in self.polymorphic_functions.
                         if the argument types match, we use that function.
                         else, we compile a new version.
+                        I'll do it later. Compile everything freshly for now.
                         */
+
+                        let mut compiled_args: Vec<BasicValueEnum> = vec![];
+
+                        arg_exprs.iter().for_each(|arg| {
+                            compiled_args.push(
+                                self.gen_expression(arg, function)
+                                    .unwrap()
+                                    .0
+                                    .as_basic_enum(self.context),
+                            )
+                        });
+
+                        let argsv: Vec<BasicMetadataValueEnum> = compiled_args
+                            .iter()
+                            .by_ref()
+                            .map(|&val| val.into())
+                            .collect();
+
+                        match self.builder.build_call(function_to_call, &argsv, "calltmp") {
+                            Ok(call_site_value) => Ok((
+                                IRValue::Simple(
+                                    call_site_value.try_as_basic_value().left().unwrap(),
+                                ),
+                                self.type_to_llvm(ret),
+                            )),
+                            Err(e) => Err(e.to_string()),
+                        }
                     }
                     (IRValue::Function(fn_, _, _), IRType::Function(args_, ret)) => {
                         let function_to_call = fn_;

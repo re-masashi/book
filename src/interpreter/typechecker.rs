@@ -179,6 +179,7 @@ impl<'a> TypeEnv {
                     Type::Struct(..) => {
                         todo!()
                     }
+                    Type::Trait(..) => todo!()
                 }
             }
             Expr::While(cond, body) => {
@@ -544,6 +545,7 @@ impl<'a> TypeEnv {
                 .into()
             }
             Type::Struct(..) => ty,
+            Type::Trait(..) => ty,
         }
     }
 
@@ -679,7 +681,7 @@ impl<'a> TypeEnv {
     }
 
     //And similarly for TypedNode:
-    fn substitute_type_vars_in_typed_node(
+    pub fn substitute_type_vars_in_typed_node(
         typed_node: TypedNode<'a>,
         substitutions: &HashMap<TypeVariable, Arc<Type>>,
     ) -> TypedNode<'a> {

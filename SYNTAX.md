@@ -9,7 +9,7 @@ def name(arg1: type1, arg2: type2) -> return_type
 	expression
 ```
 
-sometimes return types can be omitted if the function returns a literal.
+types can be omitted as the compiler infers types.
 
 ## Comments
 
