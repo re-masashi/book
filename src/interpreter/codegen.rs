@@ -20,6 +20,7 @@ use std::sync::Arc;
 
 use crate::interpreter::{
     BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, TypedNode, UnaryOperator,
+    TypeEnv
 };
 use crate::tconst;
 
@@ -33,6 +34,15 @@ pub struct IRGenerator<'ctx> {
     pos: i32,
     line_no: i32,
     file: String,
+    polymorphic_functions: HashMap<
+        String, 
+        Vec<(
+            Vec<Arc<Type>>, // args
+            Arc<Type>, // ret
+            IRValue<'ctx>, 
+            IRType<'ctx>
+        )>
+    >,
 }
 
 #[derive(Clone)]
@@ -40,6 +50,7 @@ pub enum IRType<'ctx> {
     Function(Vec<(String, IRType<'ctx>)>, Box<IRType<'ctx>>),
     Struct(StructType<'ctx>, Vec<(String, IRType<'ctx>)>),
     Simple(BasicTypeEnum<'ctx>),
+    PolyMorph // no need to store all the data
 }
 
 impl<'ctx> IRType<'ctx> {
@@ -48,6 +59,7 @@ impl<'ctx> IRType<'ctx> {
             IRType::Function(..) => todo!(),
             IRType::Struct(..) => context.ptr_type(AddressSpace::from(0)).into(),
             IRType::Simple(v) => (*v).into(),
+            IRType::PolyMorph => todo!(),
         }
     }
 
@@ -56,6 +68,7 @@ impl<'ctx> IRType<'ctx> {
             IRType::Function(..) => todo!(),
             IRType::Struct(..) => context.ptr_type(AddressSpace::from(0)).into(),
             IRType::Simple(v) => *v,
+            IRType::PolyMorph => todo!(),
         }
     }
 }
@@ -69,6 +82,12 @@ pub enum IRValue<'ctx> {
     ), // function, args, ret
     Struct(StructValue<'ctx>, Vec<(String, IRType<'ctx>)>),
     Simple(BasicValueEnum<'ctx>),
+    PolyMorph(
+        String,
+        Box<TypedExpr<'ctx>>,
+        Vec<(String, Arc<Type>)>,
+        Arc<Type>
+    )
 }
 
 impl<'ctx> IRValue<'ctx> {
@@ -77,6 +96,7 @@ impl<'ctx> IRValue<'ctx> {
             IRValue::Function(..) => todo!(),
             IRValue::Struct(..) => todo!(),
             IRValue::Simple(v) => (*v).into(),
+            IRValue::PolyMorph(..) => todo!(),
         }
     }
 
@@ -85,6 +105,7 @@ impl<'ctx> IRValue<'ctx> {
             IRValue::Function(..) => todo!(),
             IRValue::Struct(..) => todo!(),
             IRValue::Simple(v) => *v,
+            IRValue::PolyMorph(..) => todo!(),
         }
     }
 }
@@ -103,6 +124,7 @@ impl<'ctx> IRGenerator<'ctx> {
             pos: 0,
             line_no: 0,
             file,
+            polymorphic_functions: HashMap::new()
         }
     }
 
@@ -126,7 +148,7 @@ impl<'ctx> IRGenerator<'ctx> {
         let free_func = self.module.add_function("GC_free", free_type, None);
     }
 
-    pub fn gen_program(&mut self, node: &TypedNode) -> Result<(), String> {
+    pub fn gen_program(&mut self, node: &TypedNode<'ctx>) -> Result<(), String> {
         self.declare_gc_functions();
         self.gen_extern("println".to_string(), vec![tconst!("int")], tconst!("int"))?;
         self.gen_extern("printstr".to_string(), vec![tconst!("str")], tconst!("int"))?;
@@ -363,11 +385,34 @@ impl<'ctx> IRGenerator<'ctx> {
         &mut self,
         name: String,
         args: Vec<(String, Arc<Type>)>,
-        expr: &TypedExpr,
+        expr: &TypedExpr<'ctx>,
         type_: Arc<Type>,
     ) -> Result<(IRValue<'ctx>, IRType<'ctx>), String> {
         let (arg_meta_types, arg_types, ret_type) = match type_.as_ref().clone() {
-            Type::Function(_arg_types, ret_type) => {
+            Type::Function(arg_types, ret_type) => {
+                let mut is_poly = false;
+                for (_, arg_ty) in args.iter() {
+                    // println!("{:?}", arg_ty);
+                    match arg_ty.as_ref() {
+                        Type::Variable(_)=>{
+                            is_poly=true;
+                            break
+                        }
+                        _=>{}
+                    }
+                }
+                if is_poly {
+                    // self.polymorphic_functions.insert()
+                    return Ok((
+                        IRValue::PolyMorph(
+                            name.to_string(),
+                            Box::new(expr.clone()),
+                            args,
+                            ret_type.clone()
+                        ),
+                        IRType::PolyMorph
+                    ));
+                }
                 let arg_meta_types: Vec<BasicMetadataTypeEnum<'ctx>> = args
                     .iter()
                     .map(|(_name, type_)| {
@@ -454,7 +499,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
     pub fn gen_expression(
         &mut self,
-        expression: &TypedExpr,
+        expression: &TypedExpr<'ctx>,
         function: FunctionValue<'ctx>,
     ) -> Result<(IRValue<'ctx>, IRType<'ctx>), String> {
         match expression {
@@ -1023,6 +1068,23 @@ impl<'ctx> IRGenerator<'ctx> {
             }
             TypedExpr::Call(callee, args, _type_) => {
                 match self.gen_expression(callee, function)? {
+                    (IRValue::PolyMorph(name, expr, polyargs, ret), IRType::PolyMorph)=>{
+                        let mut poly_arg_types = polyargs.clone();
+                        if args.len() != polyargs.len() {
+                            return Err("Invalid number of args".to_string())
+                        }
+                        let typeenv = TypeEnv(HashMap::new());
+                        for (i, arg) in args.iter().enumerate() {
+                            poly_arg_types[i] = (poly_arg_types[i].0.clone(), get_type_from_typed_expr(arg));
+                        }
+                        // type check to see if all expressions are valid
+                        todo!()
+                        /*
+                        Then, we look up all the instances of this function in self.polymorphic_functions.
+                        if the argument types match, we use that function.
+                        else, we compile a new version.
+                        */
+                    }
                     (IRValue::Function(fn_, _, _), IRType::Function(args_, ret)) => {
                         let function_to_call = fn_;
                         let mut compiled_args: Vec<BasicValueEnum> = vec![];
@@ -1274,5 +1336,23 @@ impl<'ctx> IRGenerator<'ctx> {
             }
             _ => panic!("{:?}", ty),
         }
+    }
+}
+
+fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
+    match expr {
+        TypedExpr::Literal(_, ty) => ty.clone(),
+        TypedExpr::Variable(_, ty) => ty.clone(),
+        TypedExpr::Lambda(_, _, ty) => ty.clone(),
+        TypedExpr::Let(_, _, ty) => ty.clone(),
+        TypedExpr::If(_, _, _, ty) => ty.clone(),
+        TypedExpr::Call(_, _, ty) => ty.clone(),
+        TypedExpr::While(_, _, ty) => ty.clone(),
+        TypedExpr::BinaryOp(_, _, _, ty) => ty.clone(),
+        TypedExpr::UnaryOp(_, _, ty) => ty.clone(),
+        TypedExpr::Array(_, ty) => ty.clone(),
+        TypedExpr::Do(_, ty) => ty.clone(),
+        TypedExpr::Index(_, _, ty) => ty.clone(),
+        TypedExpr::StructAccess(_, _, ty) => ty.clone(),
     }
 }

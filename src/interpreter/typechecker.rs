@@ -348,7 +348,11 @@ impl<'a> TypeEnv {
                                     self.0.insert(arg.to_string(), type_.clone());
                                     type_.clone()
                                 }
-                                None => tvar!(self.0.len() + 1),
+                                None => {
+                                    let var = tvar!(self.0.len() + 1);
+                                    self.0.insert(arg.to_string(), var.clone());
+                                    var
+                                },
                             })
                             .collect(),
                         annoted_type.clone().into(),
@@ -415,7 +419,9 @@ impl<'a> TypeEnv {
                                         })
                                         .into(),
                                         None => {
-                                            tvar!(self.0.len() + 1)
+                                            let var = tvar!(self.0.len() + 1);
+                                            self.0.insert(arg.to_string(), var.clone());
+                                            var
                                         }
                                     },
                                 )
