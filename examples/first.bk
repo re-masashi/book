@@ -1,16 +1,9 @@
 def count_to_1M(n: int) -> int do
 	if n < 1_000_000 then do
+		print(n)
 		count_to_1M(n+1)
 	end
 end
 
-def identity(n) do
-	n
-end
-
-identity(1)
-identity(1.0)
-identity("aaa")
-
 count_to_1M(1)
-printstr("done!")
+

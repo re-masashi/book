@@ -49,6 +49,7 @@ pub struct IRGenerator<'ctx> {
             IRType<'ctx>
         )>
     >,
+    builtins: Vec<IRValue<'ctx>>
 }
 
 #[derive(Clone)]
@@ -56,7 +57,8 @@ pub enum IRType<'ctx> {
     Function(Vec<(String, IRType<'ctx>)>, Box<IRType<'ctx>>),
     Struct(StructType<'ctx>, Vec<(String, IRType<'ctx>)>),
     Simple(BasicTypeEnum<'ctx>),
-    PolyMorph // no need to store all the data
+    PolyMorph, // no need to store all the data
+    BuiltIn // functions such as type().
 }
 
 impl<'ctx> IRType<'ctx> {
@@ -66,6 +68,7 @@ impl<'ctx> IRType<'ctx> {
             IRType::Struct(..) => context.ptr_type(AddressSpace::from(0)).into(),
             IRType::Simple(v) => (*v).into(),
             IRType::PolyMorph => todo!(),
+            IRType::BuiltIn => todo!()
         }
     }
 
@@ -75,6 +78,7 @@ impl<'ctx> IRType<'ctx> {
             IRType::Struct(..) => context.ptr_type(AddressSpace::from(0)).into(),
             IRType::Simple(v) => *v,
             IRType::PolyMorph => todo!(),
+            IRType::BuiltIn => todo!()
         }
     }
 }
@@ -93,6 +97,9 @@ pub enum IRValue<'ctx> {
         Box<TypedExpr<'ctx>>,
         Vec<(String, Arc<Type>)>,
         Arc<Type>
+    ),
+    BuiltIn(
+        String,
     )
 }
 
@@ -103,6 +110,7 @@ impl<'ctx> IRValue<'ctx> {
             IRValue::Struct(..) => todo!(),
             IRValue::Simple(v) => (*v).into(),
             IRValue::PolyMorph(..) => todo!(),
+            IRValue::BuiltIn(..) => todo!()
         }
     }
 
@@ -112,6 +120,7 @@ impl<'ctx> IRValue<'ctx> {
             IRValue::Struct(..) => todo!(),
             IRValue::Simple(v) => *v,
             IRValue::PolyMorph(..) => todo!(),
+            IRValue::BuiltIn(..) => todo!()
         }
     }
 }
@@ -130,7 +139,15 @@ impl<'ctx> IRGenerator<'ctx> {
             pos: 0,
             line_no: 0,
             file,
-            polymorphic_functions: HashMap::new()
+            polymorphic_functions: HashMap::new(),
+            builtins: vec![
+                IRValue::BuiltIn(
+                    "type".to_string(),
+                ),
+                IRValue::BuiltIn(
+                    "print".to_string(),
+                )
+            ]
         }
     }
 
@@ -156,8 +173,15 @@ impl<'ctx> IRGenerator<'ctx> {
 
     pub fn gen_program(&mut self, node: &TypedNode<'ctx>) -> Result<(), String> {
         self.declare_gc_functions();
+        self.variables.insert("type".to_string(), (IRValue::BuiltIn("type".to_string()), IRType::BuiltIn));
+        self.variables.insert("print".to_string(), (IRValue::BuiltIn("print".to_string()), IRType::BuiltIn));
+
         self.gen_extern("println".to_string(), vec![t_int!()], t_int!())?;
         self.gen_extern("printstr".to_string(), vec![t_str!()], t_str!())?;
+
+        self.gen_extern("int_to_str".to_string(), vec![t_int!()], t_str!())?;
+        self.gen_extern("float_to_str".to_string(), vec![t_float!()], t_str!())?;
+        self.gen_extern("bool_to_str".to_string(), vec![t_int!()], t_str!())?;
 
         match node {
             TypedNode::Program(nodes) => {
@@ -545,6 +569,9 @@ impl<'ctx> IRGenerator<'ctx> {
                         return Ok((value.clone(), type_.clone()));
                     }
                     if let IRType::PolyMorph = type_ {
+                        return Ok((value.clone(), type_.clone()))
+                    }
+                    if let IRType::BuiltIn = type_ {
                         return Ok((value.clone(), type_.clone()))
                     }
                     let value = self
@@ -1089,6 +1116,117 @@ impl<'ctx> IRGenerator<'ctx> {
             }
             TypedExpr::Call(callee, args, type_) => {
                 match self.gen_expression(callee, function)? {
+                    (IRValue::BuiltIn(name), IRType::BuiltIn)=>{
+                        match name.as_str() {
+                            "type"=>{
+                                if args.len()!=1 {
+                                    return Err("Invalid number of arguments to function `type`".to_string())
+                                }
+                                let (compiled_arg, ty) = self.gen_expression(&args[0], function)?;
+                                let typestring = match ty {
+                                    IRType::Simple(_)=>{
+                                        match get_type_from_typed_expr(&args[0]).as_ref() {
+                                            Type::Constructor(c) =>{
+                                                c.name.clone()
+                                            } // todo: handle generics
+                                            Type::Struct(name, ..) => {
+                                                name.clone()
+                                            }
+                                            Type::Function(..) => {
+                                                "<function>".to_string()
+                                            }
+                                            _=>unreachable!()
+                                        }
+                                    }
+                                    IRType::BuiltIn => format!("<builtin {name}>"),
+                                    IRType::Struct(name, ..) => name.to_string(),
+                                    IRType::Function(..)
+                                    |IRType::PolyMorph => "<function>".to_string()
+                                };
+                                Ok(self.gen_literal(&Literal::String(typestring.into())))
+                            },
+                            "print"=>{
+                                let ret = tconst!("str");
+                                let arg = &args[0];
+                                // println!("{:#?}", arg);
+                                // for arg in args {
+                                    let (compiled_arg, ty) = self.gen_expression(&arg, function)?;
+                                    let (IRValue::Simple(str_val), _) = match ty {
+                                        IRType::Simple(_)=>{
+                                            match get_type_from_typed_expr(arg).as_ref() {
+                                                Type::Constructor(c) if c.name=="int" => {
+                                                    match self.builder.build_call(self.module.get_function("int_to_str").unwrap(), &[compiled_arg.as_meta_enum(self.context)], "calltmp") {
+                                                        Ok(call_site_value) => Ok((
+                                                            IRValue::Simple(
+                                                                call_site_value.try_as_basic_value().left().unwrap(),
+                                                            ),
+                                                            self.type_to_llvm(ret.clone()),
+                                                        )),
+                                                        Err(e) => Err(e.to_string()),
+                                                    }
+                                                }
+                                                Type::Constructor(c) if c.name=="float" => {
+                                                    match self.builder.build_call(self.module.get_function("float_to_str").unwrap(), &[compiled_arg.as_meta_enum(self.context)], "calltmp") {
+                                                        Ok(call_site_value) => Ok((
+                                                            IRValue::Simple(
+                                                                call_site_value.try_as_basic_value().left().unwrap(),
+                                                            ),
+                                                            self.type_to_llvm(ret.clone()),
+                                                        )),
+                                                        Err(e) => Err(e.to_string()),
+                                                    }
+                                                }
+                                                Type::Constructor(c) if c.name=="bool" => {
+                                                    match self.builder.build_call(self.module.get_function("bool_to_str").unwrap(), &[compiled_arg.as_meta_enum(self.context)], "calltmp") {
+                                                        Ok(call_site_value) => Ok((
+                                                            IRValue::Simple(
+                                                                call_site_value.try_as_basic_value().left().unwrap(),
+                                                            ),
+                                                            self.type_to_llvm(ret.clone()),
+                                                        )),
+                                                        Err(e) => Err(e.to_string()),
+                                                    }
+                                                }
+                                                Type::Constructor(c) if c.name=="str" => {
+                                                    Ok((compiled_arg.clone(), ty))
+                                                }
+                                                Type::Constructor(c) => {
+                                                    Ok(self.gen_literal(&Literal::String(format!("<{}>", c.name).into())))
+                                                }
+                                                Type::Struct(name, ..) => {
+                                                    Ok(self.gen_literal(&Literal::String(format!("<{}>", name).into())))
+                                                }
+                                                Type::Function(..) => {
+                                                    Ok(self.gen_literal(&Literal::String(format!("<function>").into())))
+                                                }
+                                                Type::Variable(v)=>{
+                                                    todo!()
+                                                }
+                                                Type::Trait(_) => todo!() 
+                                            }
+                                        }
+                                        IRType::BuiltIn => todo!(),
+                                        IRType::Struct(name, ..) => {
+                                            Ok(self.gen_literal(&Literal::String(format!("<{}>", name).into())))
+                                        },
+                                        IRType::Function(..)
+                                        |IRType::PolyMorph => todo!()
+                                    }? else {unreachable!()};
+                                // };
+                                // todo!()
+                                match self.builder.build_call(self.module.get_function("printstr").unwrap(), &[str_val.into()], "calltmp") {
+                                    Ok(call_site_value) => Ok((
+                                        IRValue::Simple(
+                                            call_site_value.try_as_basic_value().left().unwrap(),
+                                        ),
+                                        self.type_to_llvm(ret.clone()),
+                                    )),
+                                    Err(e) => Err(e.to_string()),
+                                }
+                            },
+                            _=>unreachable!()
+                        }
+                    }
                     (IRValue::PolyMorph(name, expr, polyargs, ret), IRType::PolyMorph)=>{
                         let mut poly_args = vec![];
                         let arg_exprs = args;

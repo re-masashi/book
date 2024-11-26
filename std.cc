@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <gc.h>
+#include <stdlib.h>
 
 using namespace std;
 
@@ -20,7 +21,27 @@ extern "C" {
         return 0;
     }
 
-    void* my_malloc(int size) {
-        return GC_malloc(size);
+    char* int_to_str(int n){
+        int length = snprintf( NULL, 0, "%d", n );
+        char* str = (char*)GC_malloc( length + 1 );
+        snprintf( str, length + 1, "%d", n );
+        return str;
+    }
+
+    char* float_to_str(float n){
+        int length = snprintf( NULL, 0, "%f", n );
+        char* str = (char*)GC_malloc( length + 1 );
+        snprintf( str, length + 1, "%f", n );
+        return str;
+    }
+
+    char* bool_to_str(int n){
+        char* str;
+        if (n!=0){
+            str = (char*)"true";
+        }else{
+            str = (char*)"false";
+        }
+        return str;
     }
 }

@@ -1,5 +1,5 @@
 use crate::interpreter::*;
-use crate::{tconst, tvar};
+use crate::{tconst, tvar, t_str, t_int};
 
 impl<'a> TypeEnv {
     pub fn expr_to_type(
@@ -50,6 +50,7 @@ impl<'a> TypeEnv {
                     t.clone(),
                 ),
                 None => {
+                    // println!("unknown type {name}");
                     self.0
                         .insert(name.to_string(), tvar!(self.0.len() + 1).clone());
                     (
@@ -145,7 +146,9 @@ impl<'a> TypeEnv {
                 }
             }
             Expr::Call(value, args) => {
+
                 let (value_, value_type) = self.expr_to_type(value, substitutions);
+                
                 match value_type.clone().as_ref() {
                     Type::Variable(_) => {
                         let new_args = args
@@ -157,19 +160,27 @@ impl<'a> TypeEnv {
                             value_type.clone(),
                         )
                     }
-                    Type::Function(_fn_args, ret_type) => {
-                        let type_ = Type::Function(
-                            args.iter().map(|_arg| tvar!(self.0.len() + 1)).collect(),
-                            tvar!(self.0.len() + 1),
-                        );
-                        unify(value_type, type_.into(), substitutions);
+                    Type::Function(fn_args, ret_type) => {
+                        let mut is_poly = false;
+                        for arg_ty in fn_args.iter() {
+                            // println!("{:?}", arg_ty);
+                            match arg_ty.as_ref() {
+                                Type::Variable(_)=>{
+                                    is_poly=true;
+                                    break
+                                }
+                                _=>{}
+                            }
+                        }
                         let new_args = args
                             .iter()
                             .map(|arg| Box::new(self.expr_to_type(arg, substitutions).0))
                             .collect::<Vec<_>>();
 
+                        // println!("value {:?}", value);
+                        // println!("unknown type {:#?}", ret_type);
                         (
-                            TypedExpr::Call(Box::new(value_), new_args, tvar!(self.0.len() + 1)),
+                            TypedExpr::Call(Box::new(value_), new_args, tvar!(self.0.len()+1)),
                             ret_type.clone(),
                         )
                     }
@@ -318,6 +329,20 @@ impl<'a> TypeEnv {
         node: &'a Node,
         substitutions: &mut HashMap<TypeVariable, Arc<Type>>,
     ) -> TypedNode<'a> {
+        self.0.insert(
+            "type".to_string(),
+            Type::Function(
+                vec![tvar!(self.0.len()+1)],
+                t_str!()
+            ).into()
+        );
+        self.0.insert(
+            "print".to_string(),
+            Type::Function(
+                vec![t_str!()],
+                t_int!()
+            ).into()
+        );
         let typed_node = match node {
             Node::Function(name, args, ret, ty) => match ty {
                 Some(ty) => {
@@ -507,7 +532,9 @@ impl<'a> TypeEnv {
                 )
             },
         };
-        Self::substitute_type_vars_in_typed_node(typed_node, substitutions)
+        let x = Self::substitute_type_vars_in_typed_node(typed_node, substitutions);
+        // println!("{:#?}", x);
+        x
     }
 
     fn substitute_type_vars(
