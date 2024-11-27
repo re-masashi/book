@@ -188,6 +188,8 @@ impl<'a> Parser<'_> {
         });
         self.tokens = tokens.into_iter().peekable();
         self.file = modulename.to_string();
+        self.line_no = 0;
+        self.pos = -1;
         let Node::Program(ast) = self.parse_program()? else {unreachable!()};
         
         self.pos = prevstate.0;

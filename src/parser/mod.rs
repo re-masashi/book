@@ -95,7 +95,7 @@ impl Parser<'_> {
 
         // More concise and safe way to get lines before/after
         let pre_line = if line_index > 1 {
-            format!("{} | {}\n", line_index, file_lines[line_index])
+            format!("{} | {}\n", line_index, file_lines[line_index-1])
         } else {
             "".to_string()
         };
