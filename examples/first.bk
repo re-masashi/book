@@ -1,3 +1,5 @@
+use "examples/example_struct.bk"
+
 def count_to_1M(n: int) -> int do
 	if n < 1_000_000 then do
 		print(n)
@@ -6,4 +8,3 @@ def count_to_1M(n: int) -> int do
 end
 
 count_to_1M(1)
-

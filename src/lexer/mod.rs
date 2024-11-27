@@ -123,6 +123,7 @@ impl Iterator for Lexer {
                 "if" => token = Ok(TokenType::If),
                 "then" => token = Ok(TokenType::Then),
                 "else" => token = Ok(TokenType::Else),
+                "use" => token = Ok(TokenType::Use),
                 // s if *"for" == s => token = Ok(TokenType::For),
                 "while" => token = Ok(TokenType::While),
                 "in" => token = Ok(TokenType::In),

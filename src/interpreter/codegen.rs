@@ -1560,6 +1560,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 generics: _,
                 traits: _,
             }) => match name.as_str() {
+                "bool" => IRType::Simple(self.context.i32_type().into()),
                 "int" => IRType::Simple(self.context.i32_type().into()),
                 "long" => IRType::Simple(self.context.i64_type().into()),
                 "float" => IRType::Simple(self.context.f32_type().into()),

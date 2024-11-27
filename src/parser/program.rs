@@ -1,14 +1,16 @@
 use crate::interpreter::Node;
-use crate::lexer::tokens::TokenType;
+use crate::lexer::tokens::{TokenType, Token};
+use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::{unwrap_some, Result};
 
 impl<'a> Parser<'_> {
-    pub fn parse_program(&'a mut self) -> Result<Node<'a>> {
+    pub fn parse_program(&mut self) -> Result<Node<'a>> {
         let mut vals = vec![];
 
         loop {
             match self.parse_program_() {
+                Ok(Node::Program(p)) => vals.append(&mut p.clone()),
                 Ok(result) => vals.push(result),
                 Err(s) if s == *"EOF" => {
                     break;
@@ -24,6 +26,7 @@ impl<'a> Parser<'_> {
             TokenType::Def => self.parse_function(),
             TokenType::Struct => self.parse_struct(),
             TokenType::Extern => self.parse_extern(),
+            TokenType::Use => self.parse_use(),
             _ => Ok(Node::Expr(Box::new(self.parse_expression()?))),
         }
         .clone()
@@ -165,5 +168,32 @@ impl<'a> Parser<'_> {
             args,
             ret_type,
         ))
+    }
+
+    pub fn parse_use(&mut self) -> Result<Node<'a>> {
+        self.advance();
+        let modulename = match self.advance().type_ {
+            TokenType::String(s) => s.to_string(),
+            TokenType::Identifier(s) => s.to_string(),
+            ref x=>return Err(format!("invalid `use` module. {x}"))
+        };
+        let lexer = Lexer::from_file(&modulename).unwrap();
+        let prevstate = (self.pos, self.line_no, self.file.clone(), self.tokens.clone());
+        let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
+        tokens.push(Token {
+            type_: TokenType::Int(0),
+            pos: 1,
+            line_no: 0,
+            file: modulename.to_string(),
+        });
+        self.tokens = tokens.into_iter().peekable();
+        self.file = modulename.to_string();
+        let Node::Program(ast) = self.parse_program()? else {unreachable!()};
+        
+        self.pos = prevstate.0;
+        self.line_no = prevstate.1;
+        self.file = prevstate.2;
+        self.tokens = prevstate.3;
+        Ok(Node::Program(ast.clone()))
     }
 }
