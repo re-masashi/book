@@ -1,0 +1,4 @@
+# math.bk
+
+def pi()->float
+	3.14

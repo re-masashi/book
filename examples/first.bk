@@ -1,4 +1,7 @@
 use "examples/example_struct.bk"
+use "examples/math.bk"
+
+extern run_server(str, int, ptr,) -> int
 
 def count_to_1M(n: int) -> int do
 	if n < 1_000_000 then do
@@ -7,4 +10,9 @@ def count_to_1M(n: int) -> int do
 	end
 end
 
-count_to_1M(1)
+def handler(req: str) -> str do
+	print("OK")
+	"hello"
+end
+
+run_server("127.0.0.1", 8000, handler)

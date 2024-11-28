@@ -116,7 +116,7 @@ impl<'ctx> IRValue<'ctx> {
 
     fn as_basic_enum(&self, context: &'ctx Context) -> BasicValueEnum<'ctx> {
         match &self {
-            IRValue::Function(..) => todo!(),
+            IRValue::Function(f, ..) => f.as_global_value().as_basic_value_enum(),
             IRValue::Struct(..) => todo!(),
             IRValue::Simple(v) => *v,
             IRValue::PolyMorph(..) => todo!(),
@@ -1560,6 +1560,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 generics: _,
                 traits: _,
             }) => match name.as_str() {
+                "ptr" => IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into()),
                 "bool" => IRType::Simple(self.context.i32_type().into()),
                 "int" => IRType::Simple(self.context.i32_type().into()),
                 "long" => IRType::Simple(self.context.i64_type().into()),
