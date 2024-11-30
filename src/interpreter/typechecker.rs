@@ -160,18 +160,18 @@ impl<'a> TypeEnv {
                             value_type.clone(),
                         )
                     }
-                    Type::Function(fn_args, ret_type) => {
-                        let mut is_poly = false;
-                        for arg_ty in fn_args.iter() {
-                            // println!("{:?}", arg_ty);
-                            match arg_ty.as_ref() {
-                                Type::Variable(_)=>{
-                                    is_poly=true;
-                                    break
-                                }
-                                _=>{}
-                            }
-                        }
+                    Type::Function(_fn_args, ret_type) => {
+                        // let mut is_poly = false;
+                        // for arg_ty in fn_args.iter() {
+                        //     // println!("{:?}", arg_ty);
+                        //     match arg_ty.as_ref() {
+                        //         Type::Variable(_)=>{
+                        //             // is_poly=true;
+                        //             break
+                        //         }
+                        //         _=>{}
+                        //     }
+                        // }
                         let new_args = args
                             .iter()
                             .map(|arg| Box::new(self.expr_to_type(arg, substitutions).0))

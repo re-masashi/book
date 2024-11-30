@@ -1,7 +1,13 @@
 use "examples/example_struct.bk"
 use "examples/math.bk"
 
-extern run_server(str, int, ptr,) -> int
+extern run_socket_server(str, int, ptr,) -> int
+extern strcmp(str, str,) -> int
+
+struct Response
+	resp str
+	close int
+end
 
 def count_to_1M(n: int) -> int do
 	if n < 1_000_000 then do
@@ -10,9 +16,18 @@ def count_to_1M(n: int) -> int do
 	end
 end
 
-def handler(req: str) -> str do
+def handler(req: str) -> Response do
 	print("OK")
-	"hello"
+	let x: int = strcmp(req, "exit
+")
+	print(x)
+	print("
+	")
+	print(req)
+	print("
+	")
+	Response("hello", if strcmp(req, "exit
+")==0 then 1 else 0)
 end
 
-run_server("127.0.0.1", 8000, handler)
+run_socket_server("127.0.0.1", 8000, handler)

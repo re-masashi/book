@@ -22,3 +22,6 @@ DD/MM/YYYY
 
 ## 24/11/2024
 	- Changed usage (now it's `book <filename>`)
+
+## 30/11/2024
+	- Socket server works
