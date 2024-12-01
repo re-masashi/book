@@ -1,0 +1,8 @@
+struct A<A,B>
+	a A
+	b B
+	c int
+end
+
+struct B
+end

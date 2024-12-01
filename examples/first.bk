@@ -9,6 +9,7 @@ struct Response
 	close int
 end
 
+
 def count_to_1M(n: int) -> int do
 	if n < 1_000_000 then do
 		print(n)
@@ -29,5 +30,3 @@ def handler(req: str) -> Response do
 	Response("hello", if strcmp(req, "exit
 ")==0 then 1 else 0)
 end
-
-run_socket_server("127.0.0.1", 8000, handler)

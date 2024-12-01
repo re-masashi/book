@@ -1439,9 +1439,9 @@ impl<'ctx> IRGenerator<'ctx> {
                     vec![TypedExpr::Literal(Literal::Int(0).into(), tconst!("int"))];
                 expressions_.append(&mut expressions.clone());
 
-                expressions_
-                    .iter()
-                    .for_each(|expr| exprs.push(self.gen_expression(expr, function).unwrap().0));
+                for expr in expressions_{
+                    exprs.push(self.gen_expression(&expr, function)?.0)
+                }
 
                 match exprs.last() {
                     None => Ok((

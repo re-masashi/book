@@ -1,0 +1,12 @@
+# Test comments
+
+######
+#####
+
+1212 # comment
+
+somefunc(
+	param a,
+	# some comment
+	param b,
+)

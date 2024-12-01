@@ -12,6 +12,9 @@ pub mod expression;
 pub mod function;
 pub mod program;
 
+#[cfg(test)]
+pub mod tests;
+
 type TokenIter = Peekable<IntoIter<Token>>;
 
 #[derive(Debug, Clone)]

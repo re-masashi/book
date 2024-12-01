@@ -39,6 +39,18 @@ impl<'a> Parser<'_> {
             TokenType::LBrack => self.parse_array()?,
             TokenType::If => self.parse_if()?,
             TokenType::Let => self.parse_let()?,
+            TokenType::LParen => {
+                let mut v = self.parse_expression()?;
+                println!("{:?}", v);
+                match self.advance().type_ {
+                    TokenType::RParen => {},
+                    TokenType::Comma => {
+                        v = self.parse_tuple(v)?
+                    }
+                    ref x=>return Err(format!("unclosed delimiter. expected ')' or ','. found {x}"))
+                }
+                v
+            }
             TokenType::While => {
                 let cond = self.parse_expression()?;
                 match self.advance().type_ {
@@ -163,15 +175,41 @@ impl<'a> Parser<'_> {
 
     fn parse_array(&mut self) -> Result<Expr<'a>> {
         let mut args = vec![];
+        println!("{:?}", self.tokens.peek());
         loop {
-            if unwrap_some!(self.tokens.peek()).type_ == TokenType::End {
-                self.advance(); // Eat ','
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::RBrack {
                 break;
-            } else {
-                args.push(self.parse_expression()?);
+            }
+            
+            args.push(self.parse_expression()?);
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                self.advance(); // Eat ','
+                continue;
             }
         }
+        if let TokenType::RBrack = unwrap_some!(self.tokens.peek()).type_ {
+            self.advance(); // eat ']'
+        }
+
         Ok(Expr::Array(args))
+    }
+
+    fn parse_tuple(&mut self, expr: Expr<'a>) -> Result<Expr<'a>> {
+        let mut vals = vec![expr];
+        loop {
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                self.advance(); // eat ')'
+                break;
+            }
+            vals.push(self.parse_expression()?);
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                self.advance(); // eat ','
+            }else{
+                return Err(format!("expected ',' or `)` in tuple found {} instead", self.advance().type_))
+            }
+        }
+        todo!()
+        // Ok(Expr::Array(args))
     }
 
     fn parse_if(&mut self) -> Result<Expr<'a>> {

@@ -17,6 +17,10 @@ impl<'a> Parser<'_> {
                 }
                 Err(e) => return Err(e),
             }
+            match unwrap_some!(self.tokens.peek()).type_ {
+                TokenType::Semicolon => {self.advance();},
+                _=>{}
+            }
         }
         Ok(Node::Program(vals))
     }

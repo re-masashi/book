@@ -1,0 +1,68 @@
+# test_expressions.bk
+
+# literals
+42;
+-1 # semicolon added here. else it's parsed as 42-1
+2.0; 
+false
+true
+
+# binops
+1+1
+2.21+1212.0
+11-21
+11*11
+11/11
+1==2
+3!=1
+1>2
+
+# calls
+green()
+red(1,2,)
+blue(1,1, "aaaa", red(1,2), 2)
+
+# let
+let x = 21
+let y: int = 21
+
+# variables
+x+y
+
+# lambdas
+fn() 1
+fn (x: i32, y: i32) x+y;
+
+# arrays
+
+[1, 2, 3,]
+[1212, 1, "salsa"]
+
+# if else
+
+if 1==1 then
+	212
+else
+	call(21)
+
+if true then do
+	hi
+	cya()
+end else
+	aaaa
+
+if 21 then
+	aaaaa
+
+if do callsumn() 1==2 end then
+	21
+
+## index
+
+a[12]
+a[a]
+a[calc()]
+
+## struct access
+
+a.aa
