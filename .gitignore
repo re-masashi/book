@@ -1,5 +1,5 @@
 /target
 /book/.venv/
-a.out
-examples/*.o
-examples/*.out
+/a.out
+/examples/*.o
+/examples/*.out
