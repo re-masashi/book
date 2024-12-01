@@ -231,13 +231,13 @@ impl<'a> Parser<'_> {
             TokenType::Else => {
                 self.advance();
                 let else_branch = self.parse_expression()?;
-                return Ok(Expr::If(
+                Ok(Expr::If(
                     Box::new(cond),
                     Box::new(if_branch),
                     Some(Box::new(else_branch)),
-                ));
+                ))
             }
-            _ => return Ok(Expr::If(Box::new(cond), Box::new(if_branch), None)),
+            _ => Ok(Expr::If(Box::new(cond), Box::new(if_branch), None)),
         }
     }
 
