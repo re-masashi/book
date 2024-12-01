@@ -1,0 +1,117 @@
+%YAML 1.2
+---
+name: Book
+scope: source.book
+# See http://www.sublimetext.com/docs/syntax.html
+file_extensions:
+  - bk
+
+contexts:
+  main:
+    # Strings begin and end with quotes, and use backslashes as an escape
+    # character
+    - match: '"'
+      scope: punctuation.definition.string.begin.book
+      push: double_quoted_string
+
+    # Comments begin with a '//' and finish at the end of the line
+    - match: '#'
+      scope: punctuation.definition.comment.example-c
+      push: line_comment
+
+    # Keywords are if, else for and while.
+    # Note that blackslashes don't need to be escaped within single quoted
+    # strings in YAML. When using single quoted strings, only single quotes
+    # need to be escaped: this is done by using two single quotes next to each
+    # other.
+    - match: '\b(if|else|for|while|do|end|then|let|use|extern)\b'
+      scope: keyword.control.book
+
+    - match: '\b(int|float|str|ptr)\b'
+      scope: keyword.type
+
+    - match: '->'
+      scope: punctuation.accessor.arrow.book
+    - match: ':'
+      scope: punctuation.separator.book
+    - match: '\.'
+      scope: punctuation.accessor.dot.book
+
+    - match: 'struct\s+([A-Za-z][A-Za-z0-9_]*)'
+      captures:
+        '0': keyword.storage.book
+        '1': entity.name
+      push: struct_body
+
+    - match: '(def)\s+([A-Za-z][A-Za-z0-9_]*)\s*\(\s*'
+      captures:
+        '1': keyword.storage.book
+        '2': entity.name.function
+      push: def_proto
+
+    - match: '(fn)\s*\(\s*'
+      captures:
+        '1': keyword.storage.book
+        '2': entity.name.function
+      push: def_proto
+
+    - match: '([a-zA-Z_][a-zA-Z0-9_]*)\('
+      captures:
+        '1': variable.function
+      push: brackets
+
+    - match: '(<)([a-zA-Z_][a-zA-Z0-9_]*,?\s*)*\s*(>)'
+      scope: punctuation.accessor.book
+
+    # Numbers
+    - match: '\b(-)?[0-9]([_0-9.])*\b'
+      scope: constant.numeric.book
+
+    - match: \(
+      push: brackets
+
+    - match: \)
+      scope: invalid.illegal.stray-bracket-end
+
+    - match: '[a-zA-Z][A-Za-z0-9_]*'
+      scope: variable.book
+
+  brackets:
+    - match: \)
+      pop: true
+    - include: main
+
+  struct_body:
+    - match: '([a-zA-Z_][a-zA-Z0-9_]*)\s+([a-zA-Z_][a-zA-Z0-9_]*)'
+      captures:
+        '1': variable.member
+        '2': storage.type # todo: get a better color
+    - match: '\bend\b'
+      scope: keyword.control.book
+      pop: true
+
+  def_proto:
+    - match: '([a-zA-Z_][a-zA-Z0-9_]*)\s*:(\s*([a-zA-Z_][a-zA-Z0-9_]*))?'
+      captures:
+        '1': variable.parameter
+        '2': storage # todo: get a better color
+    - match: '\)\s*(->)\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*'
+      captures:
+        '1': punctuation.accessor.arrow.book
+        '2': storage.type
+      pop: true
+    - match: '\)'
+      pop: true
+
+  double_quoted_string:
+    - meta_scope: string.quoted.double.book
+    - match: '\\.'
+      scope: constant.character.escape.book
+    - match: '"'
+      scope: punctuation.definition.string.end.book
+      pop: true
+
+  line_comment:
+    - meta_scope: comment.line.book
+    - match: $
+      pop: true
