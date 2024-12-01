@@ -166,9 +166,14 @@ impl<'ctx> IRGenerator<'ctx> {
             "print".to_string(),
             (IRValue::BuiltIn("print".to_string()), IRType::BuiltIn),
         );
+        self.variables.insert(
+            "println".to_string(),
+            (IRValue::BuiltIn("println".to_string()), IRType::BuiltIn),
+        );
 
-        self.gen_extern("println".to_string(), vec![t_int!()], t_int!())?;
+        self.gen_extern("printint".to_string(), vec![t_int!()], t_int!())?;
         self.gen_extern("printstr".to_string(), vec![t_str!()], t_str!())?;
+        self.gen_extern("printstrln".to_string(), vec![t_str!()], t_int!())?;
 
         self.gen_extern("int_to_str".to_string(), vec![t_int!()], t_str!())?;
         self.gen_extern("float_to_str".to_string(), vec![t_float!()], t_str!())?;
@@ -349,7 +354,7 @@ impl<'ctx> IRGenerator<'ctx> {
         self.print_ir();
 
         let exec_name = &(self.file.clone()[..=self.file.len() - 4].to_string() + ".out");
-        println!("emitting {:?}. binding {:?}", exec_name, binding);
+        // println!("emitting {:?}. binding {:?}", exec_name, binding);
 
         assert!(target_machine
             .write_to_file(&self.module, FileType::Object, path)

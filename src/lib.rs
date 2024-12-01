@@ -1,3 +1,6 @@
+use std::path::PathBuf;
+use clap::{Parser, Subcommand};
+
 pub mod interpreter;
 pub mod lexer;
 pub mod parser;
@@ -12,4 +15,32 @@ macro_rules! unwrap_some {
             None => return Err("EOF".to_string()),
         }
     };
+}
+
+#[derive(Parser)]
+#[command(version, about, long_about = None)]
+pub struct Cli {
+
+    /// todo: Sets a custom config file
+    #[arg(short, long, value_name = "CONFIG")]
+    pub config: Option<PathBuf>,
+
+    /// todo: Turn debugging information on
+    #[arg(short, long, action = clap::ArgAction::Count)]
+    pub debug: u8,
+
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+}
+
+#[derive(Subcommand)]
+pub enum Commands {
+    /// builds and runs a file
+    Run{
+        file: String
+    },
+    /// builds a file
+    Build{
+        file: String
+    }
 }

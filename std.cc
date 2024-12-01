@@ -20,8 +20,8 @@ struct Response{
 
 extern "C" {
 
-    int println(int n) {
-        printf("%d\n", n); // Print integer followed by a newline
+    int printint(int n) {
+        printf("%d", n); // Print integer followed by a newline
         return n; // Return the integer
     }
 
