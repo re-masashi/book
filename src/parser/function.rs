@@ -1,6 +1,6 @@
-#![allow(clippy::needless_lifetimes)] 
+#![allow(clippy::needless_lifetimes)]
 // clippy goes nuts for no reason at all over false positives.
-// see https://github.com/rust-lang/rust-clippy/issues/740 
+// see https://github.com/rust-lang/rust-clippy/issues/740
 // and https://github.com/rust-lang/rust-clippy/issues/13749 maybe
 
 use crate::interpreter::{Node, TypeAnnot};
