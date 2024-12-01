@@ -2,9 +2,12 @@ use book::{
     interpreter::{codegen::IRGenerator, TypeEnv},
     lexer::{tokens::Token, tokens::TokenType, Lexer},
     parser::Parser,
-    Cli, Commands
+    Cli, Commands,
 };
-use std::{collections::HashMap, process::{self, Command}};
+use std::{
+    collections::HashMap,
+    process::{self, Command},
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     use clap::Parser;
@@ -17,17 +20,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     match cli.debug {
-        0=>{}
+        0 => {}
         _ => todo!(),
     }
 
     match &cli.command {
         Some(Commands::Run { file }) => {
-            build_file(&file)?;
-            run_file(&file)?;
+            build_file(file)?;
+            run_file(file)?;
         }
         Some(Commands::Build { file }) => {
-            build_file(&file)?;
+            build_file(file)?;
         }
         None => {}
     }
@@ -72,8 +75,8 @@ fn build_file(source_path: &String) -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn run_file(source_path: &String) -> Result<(), Box<dyn std::error::Error>> {
-    let exec_name = &(source_path.clone()[..=source_path.len() - 4].to_string() + ".out");
+fn run_file(source_path: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let exec_name = &(source_path.to_owned()[..=source_path.len() - 4].to_string() + ".out");
     Command::new(exec_name)
         .status()
         .expect("failed to execute process");

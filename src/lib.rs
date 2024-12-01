@@ -1,5 +1,5 @@
-use std::path::PathBuf;
 use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 pub mod interpreter;
 pub mod lexer;
@@ -20,7 +20,6 @@ macro_rules! unwrap_some {
 #[derive(Parser)]
 #[command(version, about, long_about = None)]
 pub struct Cli {
-
     /// todo: Sets a custom config file
     #[arg(short, long, value_name = "CONFIG")]
     pub config: Option<PathBuf>,
@@ -36,11 +35,7 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// builds and runs a file
-    Run{
-        file: String
-    },
+    Run { file: String },
     /// builds a file
-    Build{
-        file: String
-    }
+    Build { file: String },
 }
