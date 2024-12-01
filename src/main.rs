@@ -3,13 +3,16 @@ use book::{
     lexer::{tokens::Token, tokens::TokenType, Lexer},
     parser::Parser,
 };
-use std::{collections::HashMap, process};
 use std::env;
+use std::{collections::HashMap, process};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args: Vec<String> = env::args().collect();
 
-    let Some(source_path) = args.get(1) else {println!("usage: book <filename>"); process::exit(0)};
+    let Some(source_path) = args.get(1) else {
+        println!("usage: book <filename>");
+        process::exit(0)
+    };
     let lexer = Lexer::from_file(source_path)?;
     let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
     tokens.push(Token {

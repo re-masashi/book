@@ -1,5 +1,5 @@
 use crate::interpreter::*;
-use crate::{tconst, tvar, t_str, t_int};
+use crate::{t_int, t_str, tconst, tvar};
 
 impl<'a> TypeEnv {
     pub fn expr_to_type(
@@ -146,9 +146,8 @@ impl<'a> TypeEnv {
                 }
             }
             Expr::Call(value, args) => {
-
                 let (value_, value_type) = self.expr_to_type(value, substitutions);
-                
+
                 match value_type.clone().as_ref() {
                     Type::Variable(_) => {
                         let new_args = args
@@ -161,26 +160,12 @@ impl<'a> TypeEnv {
                         )
                     }
                     Type::Function(_fn_args, ret_type) => {
-                        // let mut is_poly = false;
-                        // for arg_ty in fn_args.iter() {
-                        //     // println!("{:?}", arg_ty);
-                        //     match arg_ty.as_ref() {
-                        //         Type::Variable(_)=>{
-                        //             // is_poly=true;
-                        //             break
-                        //         }
-                        //         _=>{}
-                        //     }
-                        // }
                         let new_args = args
                             .iter()
                             .map(|arg| Box::new(self.expr_to_type(arg, substitutions).0))
                             .collect::<Vec<_>>();
-
-                        // println!("value {:?}", value);
-                        // println!("unknown type {:#?}", ret_type);
                         (
-                            TypedExpr::Call(Box::new(value_), new_args, tvar!(self.0.len()+1)),
+                            TypedExpr::Call(Box::new(value_), new_args, ret_type.clone()),
                             ret_type.clone(),
                         )
                     }
@@ -190,7 +175,7 @@ impl<'a> TypeEnv {
                     Type::Struct(..) => {
                         todo!()
                     }
-                    Type::Trait(..) => todo!()
+                    Type::Trait(..) => todo!(),
                 }
             }
             Expr::While(cond, body) => {
@@ -331,17 +316,11 @@ impl<'a> TypeEnv {
     ) -> TypedNode<'a> {
         self.0.insert(
             "type".to_string(),
-            Type::Function(
-                vec![tvar!(self.0.len()+1)],
-                t_str!()
-            ).into()
+            Type::Function(vec![tvar!(self.0.len() + 1)], t_str!()).into(),
         );
         self.0.insert(
             "print".to_string(),
-            Type::Function(
-                vec![t_str!()],
-                t_int!()
-            ).into()
+            Type::Function(vec![t_str!()], t_int!()).into(),
         );
         let typed_node = match node {
             Node::Function(name, args, ret, ty) => match ty {
@@ -378,7 +357,7 @@ impl<'a> TypeEnv {
                                     let var = tvar!(self.0.len() + 1);
                                     self.0.insert(arg.to_string(), var.clone());
                                     var
-                                },
+                                }
                             })
                             .collect(),
                         annoted_type.clone().into(),
@@ -502,7 +481,8 @@ impl<'a> TypeEnv {
                         .map(|generic| tconst!(generic))
                         .collect(),
                     traits: vec![],
-                }).into();
+                })
+                .into();
                 let mut typed_args = vec![];
                 let type_ = Type::Function(
                     args.iter()
@@ -525,12 +505,8 @@ impl<'a> TypeEnv {
                     annoted_type.clone(),
                 );
                 self.0.insert(name.to_string(), type_.into());
-                TypedNode::Extern(
-                    name.clone(),
-                    typed_args,
-                    annoted_type.clone()
-                )
-            },
+                TypedNode::Extern(name.clone(), typed_args, annoted_type.clone())
+            }
         };
         let x = Self::substitute_type_vars_in_typed_node(typed_node, substitutions);
         // println!("{:#?}", x);

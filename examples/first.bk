@@ -9,7 +9,6 @@ struct Response
 	close int
 end
 
-
 def count_to_1M(n: int) -> int do
 	if n < 1_000_000 then do
 		print(n)
@@ -18,15 +17,10 @@ def count_to_1M(n: int) -> int do
 end
 
 def handler(req: str) -> Response do
-	print("OK")
-	let x: int = strcmp(req, "exit
-")
-	print(x)
-	print("
-	")
-	print(req)
-	print("
-	")
-	Response("hello", if strcmp(req, "exit
-")==0 then 1 else 0)
+	print("OK\n")
+	let x: int = strcmp(req, "exit")
+	Response("hello", if strcmp(req, "exit")==0 then 1 else 0)
 end
+
+let x = type("example string")
+print(x)

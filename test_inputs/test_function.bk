@@ -1,2 +1,2 @@
-def x(a: i32, n, c: Array<i32>) -> i32
+def x(a: int, n, c: Array<int>) -> int
 	0

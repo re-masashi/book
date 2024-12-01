@@ -1,5 +1,11 @@
 pub mod tokens;
 
+#[cfg(test)]
+pub mod test_keywords;
+pub mod test_literals;
+pub mod test_operators;
+pub mod test_punctuators;
+
 use crate::lexer::tokens::{Token, TokenType};
 use crate::Result;
 use std::iter::Peekable;
@@ -171,6 +177,10 @@ impl Iterator for Lexer {
 
             self.get_next_char_while(&mut value, |c| c != '"');
             self.raw_data.next(); // Eat trailing "
+            value = value.replace("\\n", "\n").to_string();
+            value = value.replace("\\r", "\r").to_string();
+            value = value.replace("\\t", "\t").to_string();
+            value = value.replace("\\\\", "\\").to_string();
 
             token = Ok(TokenType::String(value));
         } else if current_char == '\'' {
@@ -325,3 +335,4 @@ impl Iterator for Lexer {
         }))
     }
 }
+

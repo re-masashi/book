@@ -1,5 +1,5 @@
-use crate::parser::*;
 use crate::lexer::Lexer;
+use crate::parser::*;
 
 macro_rules! parse {
     ($source_path: expr) => {

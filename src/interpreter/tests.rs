@@ -162,10 +162,7 @@ fn test_typechecker_variable() {
 fn test_typechecker_lambda() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::Lambda(
-        vec![(
-            std::borrow::Cow::Borrowed("x"), 
-            None
-        )],
+        vec![(std::borrow::Cow::Borrowed("x"), None)],
         Box::new(Expr::BinaryOp(
             Box::new(Expr::Variable(std::borrow::Cow::Borrowed("x"))),
             BinaryOperator::Add,

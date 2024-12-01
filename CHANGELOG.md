@@ -25,3 +25,10 @@ DD/MM/YYYY
 
 ## 30/11/2024
 	- Socket server works
+
+## 1/12/2024
+	- Syntax highlighting for Sublime-Text
+
+## 2/12/2024
+	- Added tests for lexer and parser.
+	- Setup a GH actions workflow.

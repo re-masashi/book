@@ -4,5 +4,8 @@ struct A<A,B>
 	c int
 end
 
-struct B
+struct B<A>
+end
+
+struct C
 end

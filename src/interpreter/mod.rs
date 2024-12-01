@@ -49,7 +49,7 @@ macro_rules! t_int {
             traits: vec![
                 "Number".to_string(),
                 "Printable".to_string(),
-                "Simple".to_string()
+                "Simple".to_string(),
             ],
         }))
     };
@@ -64,7 +64,7 @@ macro_rules! t_float {
             traits: vec![
                 "Number".to_string(),
                 "Printable".to_string(),
-                "Simple".to_string()
+                "Simple".to_string(),
             ],
         }))
     };
@@ -76,10 +76,7 @@ macro_rules! t_str {
         Arc::new(Type::Constructor(TypeConstructor {
             name: "str".to_string(),
             generics: vec![],
-            traits: vec![
-                "Printable".to_string(),
-                "Simple".to_string()
-            ],
+            traits: vec!["Printable".to_string(), "Simple".to_string()],
         }))
     };
 }
@@ -90,10 +87,7 @@ macro_rules! t_bool {
         Arc::new(Type::Constructor(TypeConstructor {
             name: "bool".to_string(),
             generics: vec![],
-            traits: vec![
-                "Printable".to_string(),
-                "Simple".to_string()
-            ],
+            traits: vec!["Printable".to_string(), "Simple".to_string()],
         }))
     };
 }
@@ -261,7 +255,7 @@ impl Type {
                 ret.substitute(substitutions),
             )),
             Type::Struct(..) => self.clone().into(),
-            Type::Trait(_) => self.clone().into()
+            Type::Trait(_) => self.clone().into(),
         }
     }
 }
@@ -299,7 +293,7 @@ impl TypeVariable {
             }
             Type::Function(_, _) => todo!(),
             Type::Struct(_, _, _) => todo!(),
-            Type::Trait(_) => todo!()
+            Type::Trait(_) => todo!(),
         }
     }
 }
@@ -362,7 +356,7 @@ fn unify(left: Arc<Type>, right: Arc<Type>, substitutions: &mut HashMap<TypeVari
         (Type::Function(_, _), _) => {
             panic!("invalid type");
         }
-        _=>todo!()
+        _ => todo!(),
     }
 }
 
@@ -394,7 +388,7 @@ pub fn dosumn() {
                 Type::Variable(_) => format!("T{}", i),
                 Type::Function(_, _) => format!("fn{}", i),
                 Type::Struct(..) => "struct".to_string(),
-                Type::Trait(t)=>format!("Trait {t}")
+                Type::Trait(t) => format!("Trait {t}"),
             }
         );
     }

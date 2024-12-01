@@ -1,5 +1,5 @@
 use crate::interpreter::Node;
-use crate::lexer::tokens::{TokenType, Token};
+use crate::lexer::tokens::{Token, TokenType};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::{unwrap_some, Result};
@@ -17,9 +17,8 @@ impl<'a> Parser<'_> {
                 }
                 Err(e) => return Err(e),
             }
-            match unwrap_some!(self.tokens.peek()).type_ {
-                TokenType::Semicolon => {self.advance();},
-                _=>{}
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::Semicolon {
+                self.advance();
             }
         }
         Ok(Node::Program(vals))
@@ -59,12 +58,7 @@ impl<'a> Parser<'_> {
                         generics.push(std::borrow::Cow::Owned(argname.clone()));
                         self.advance();
                     }
-                    ref x => {
-                        return Err(format!(
-                            "expected identifier in generic. found {}",
-                            x
-                        ))
-                    }
+                    ref x => return Err(format!("expected identifier in generic. found {}", x)),
                 }
                 if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                     self.advance(); // Eat ','
@@ -109,16 +103,13 @@ impl<'a> Parser<'_> {
     }
 
     pub fn parse_extern(&mut self) -> Result<Node<'a>> {
-
         self.advance(); // eat 'extern'
-        
+
         let mut args = vec![];
-        
+
         let token = self.advance();
         let name = match token.type_ {
-            TokenType::Identifier(ref n) => {
-                n.clone()
-            }
+            TokenType::Identifier(ref n) => n.clone(),
             ref x => {
                 return Err(format!(
                     "expected a function name after 'extern'. found {}",
@@ -143,8 +134,11 @@ impl<'a> Parser<'_> {
                                 break;
                             }
                             continue;
-                        }else {
-                            return Err(format!("Expected ',' after type in `extern` definition. found {}", unwrap_some!(self.tokens.peek()).type_))
+                        } else {
+                            return Err(format!(
+                                "Expected ',' after type in `extern` definition. found {}",
+                                unwrap_some!(self.tokens.peek()).type_
+                            ));
                         }
                     }
                     if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
@@ -163,15 +157,14 @@ impl<'a> Parser<'_> {
         let ret_type = if unwrap_some!(self.tokens.peek()).type_ == TokenType::Arrow {
             self.advance();
             self.parse_type()?
-        }else{
-            return Err(format!("Expected an arrow followed by a return type after extern definition. found {}", unwrap_some!(self.tokens.peek()).type_))
+        } else {
+            return Err(format!(
+                "Expected an arrow followed by a return type after extern definition. found {}",
+                unwrap_some!(self.tokens.peek()).type_
+            ));
         };
 
-        Ok(Node::Extern(
-            std::borrow::Cow::Owned(name),
-            args,
-            ret_type,
-        ))
+        Ok(Node::Extern(std::borrow::Cow::Owned(name), args, ret_type))
     }
 
     pub fn parse_use(&mut self) -> Result<Node<'a>> {
@@ -179,10 +172,15 @@ impl<'a> Parser<'_> {
         let modulename = match self.advance().type_ {
             TokenType::String(s) => s.to_string(),
             TokenType::Identifier(s) => s.to_string(),
-            ref x=>return Err(format!("invalid `use` module. {x}"))
+            ref x => return Err(format!("invalid `use` module. {x}")),
         };
         let lexer = Lexer::from_file(&modulename).unwrap();
-        let prevstate = (self.pos, self.line_no, self.file.clone(), self.tokens.clone());
+        let prevstate = (
+            self.pos,
+            self.line_no,
+            self.file.clone(),
+            self.tokens.clone(),
+        );
         let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
         tokens.push(Token {
             type_: TokenType::Int(0),
@@ -194,8 +192,10 @@ impl<'a> Parser<'_> {
         self.file = modulename.to_string();
         self.line_no = 0;
         self.pos = -1;
-        let Node::Program(ast) = self.parse_program()? else {unreachable!()};
-        
+        let Node::Program(ast) = self.parse_program()? else {
+            unreachable!()
+        };
+
         self.pos = prevstate.0;
         self.line_no = prevstate.1;
         self.file = prevstate.2;

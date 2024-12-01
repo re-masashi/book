@@ -7,12 +7,7 @@ impl<'a> Parser<'_> {
     pub fn parse_type(&mut self) -> Result<TypeAnnot> {
         let type_name = match self.advance().type_ {
             TokenType::Identifier(ref i) => i.to_string(),
-            x => {
-                return Err(format!(
-                    "invalid type without an identifier. found `{}`",
-                    x
-                ))
-            }
+            x => return Err(format!("invalid type without an identifier. found `{}`", x)),
         };
         let mut generics = vec![];
         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Less {
@@ -24,12 +19,7 @@ impl<'a> Parser<'_> {
                         generics.push(argname.to_string());
                         self.advance();
                     }
-                    ref x => {
-                        return Err(format!(
-                            "expected identifier in generic. found {}",
-                            x
-                        ))
-                    }
+                    ref x => return Err(format!("expected identifier in generic. found {}", x)),
                 }
                 if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                     self.advance(); // Eat ','
@@ -65,12 +55,7 @@ impl<'a> Parser<'_> {
                 n.clone()
                 // println!("found a function named {:?}", n);
             }
-            ref x => {
-                return Err(format!(
-                    "expected a function name after 'def'. found {}",
-                    x
-                ))
-            }
+            ref x => return Err(format!("expected a function name after 'def'. found {}", x)),
         };
         // println!("def after name {:?}", self.tokens.peek());
 
@@ -93,9 +78,7 @@ impl<'a> Parser<'_> {
                                     args.push((argname_clone, None));
                                 }
                             }
-                            ref x => {
-                                return Err(format!("expected identifier. found {}", x))
-                            }
+                            ref x => return Err(format!("expected identifier. found {}", x)),
                         }
                         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                             self.advance(); // Eat ','

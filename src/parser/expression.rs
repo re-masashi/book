@@ -43,11 +43,13 @@ impl<'a> Parser<'_> {
                 let mut v = self.parse_expression()?;
                 println!("{:?}", v);
                 match self.advance().type_ {
-                    TokenType::RParen => {},
-                    TokenType::Comma => {
-                        v = self.parse_tuple(v)?
+                    TokenType::RParen => {}
+                    TokenType::Comma => v = self.parse_tuple(v)?,
+                    ref x => {
+                        return Err(format!(
+                            "unclosed delimiter. expected ')' or ','. found {x}"
+                        ))
                     }
-                    ref x=>return Err(format!("unclosed delimiter. expected ')' or ','. found {x}"))
                 }
                 v
             }
@@ -70,12 +72,7 @@ impl<'a> Parser<'_> {
                 Expr::UnaryOp(UnaryOperator::Negate, Box::new(self.parse_expression()?))
             }
             TokenType::Not => Expr::UnaryOp(UnaryOperator::Not, Box::new(self.parse_expression()?)),
-            ref x => {
-                return Err(format!(
-                    "expected a valid expression. found `{}`.",
-                    x
-                ))
-            }
+            ref x => return Err(format!("expected a valid expression. found `{}`.", x)),
         };
 
         while let TokenType::LBrack = unwrap_some!(self.tokens.peek()).type_ {
@@ -108,12 +105,12 @@ impl<'a> Parser<'_> {
                 }
             }
             l_value = Expr::Call(Box::new(l_value), args);
-            
+
             if let TokenType::RParen = unwrap_some!(self.tokens.peek()).type_ {
                 self.advance(); // eat ')'
             }
         }
-        
+
         if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
             self.advance(); // eat trailing ','
         }
@@ -133,17 +130,18 @@ impl<'a> Parser<'_> {
         }
 
         while let TokenType::Plus
-            | TokenType::Minus
-            | TokenType::Mul
-            | TokenType::Div
-            | TokenType::Equal
-            | TokenType::Greater
-            | TokenType::Less
-            | TokenType::GreaterEq
-            | TokenType::LessEq
-            | TokenType::NotEq
-            | TokenType::And
-            | TokenType::Or = unwrap_some!(self.tokens.peek()).type_ {
+        | TokenType::Minus
+        | TokenType::Mul
+        | TokenType::Div
+        | TokenType::Equal
+        | TokenType::Greater
+        | TokenType::Less
+        | TokenType::GreaterEq
+        | TokenType::LessEq
+        | TokenType::NotEq
+        | TokenType::And
+        | TokenType::Or = unwrap_some!(self.tokens.peek()).type_
+        {
             let op = tokentype_to_binop(self.advance().type_);
             let r_value = self.parse_expression()?;
             l_value = Expr::BinaryOp(Box::new(l_value), op, Box::new(r_value))
@@ -180,7 +178,7 @@ impl<'a> Parser<'_> {
             if unwrap_some!(self.tokens.peek()).type_ == TokenType::RBrack {
                 break;
             }
-            
+
             args.push(self.parse_expression()?);
             if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                 self.advance(); // Eat ','
@@ -204,8 +202,11 @@ impl<'a> Parser<'_> {
             vals.push(self.parse_expression()?);
             if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                 self.advance(); // eat ','
-            }else{
-                return Err(format!("expected ',' or `)` in tuple found {} instead", self.advance().type_))
+            } else {
+                return Err(format!(
+                    "expected ',' or `)` in tuple found {} instead",
+                    self.advance().type_
+                ));
             }
         }
         todo!()
@@ -259,12 +260,7 @@ impl<'a> Parser<'_> {
         };
         match self.advance().type_ {
             TokenType::Assign => {}
-            ref x => {
-                return Err(format!(
-                    "expected `=` after `let`. Found `{}`",
-                    x
-                ))
-            }
+            ref x => return Err(format!("expected `=` after `let`. Found `{}`", x)),
         }
         let val = self.parse_expression()?;
         Ok(Expr::Let(identifier, type_, Box::new(val)))
@@ -290,12 +286,7 @@ impl<'a> Parser<'_> {
                                     args.push((argname_clone, None));
                                 }
                             }
-                            ref x => {
-                                return Err(format!(
-                                    "expected identifier. found `{}`",
-                                    x
-                                ))
-                            }
+                            ref x => return Err(format!("expected identifier. found `{}`", x)),
                         }
                         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                             self.advance(); // Eat ','

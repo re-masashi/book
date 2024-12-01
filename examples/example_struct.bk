@@ -8,6 +8,7 @@ struct Person
 	name str
 end
 
-
-let x: Person = Person(17, "masashi 
-")
+# use the constructor created along with the struct
+let x: Person = Person(17, "masashi")
+let age: int = x.age
+println(age)
