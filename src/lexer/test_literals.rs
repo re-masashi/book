@@ -1,12 +1,15 @@
 #[cfg(test)]
-use crate::lexer::{Lexer, tokens::TokenType};
+use crate::lexer::{tokens::TokenType, Lexer};
 
 #[test]
 fn test_identifier() {
     let lexer = Lexer::from_text("let x = 10;", "");
     let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>().into_iter();
     assert_eq!(tokens.next().unwrap().type_, TokenType::Let);
-    assert_eq!(tokens.next().unwrap().type_, TokenType::Identifier("x".to_string()));
+    assert_eq!(
+        tokens.next().unwrap().type_,
+        TokenType::Identifier("x".to_string())
+    );
 }
 
 #[test]
@@ -20,7 +23,10 @@ fn test_integer_literal() {
 fn test_integer_literal_underscores() {
     let lexer = Lexer::from_text("1_000_000", "");
     let tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
-    assert_eq!(tokens.iter().next().unwrap().type_, TokenType::Int(1_000_000));
+    assert_eq!(
+        tokens.iter().next().unwrap().type_,
+        TokenType::Int(1_000_000)
+    );
 }
 
 #[test]
@@ -34,7 +40,10 @@ fn test_float_literal() {
 fn test_float_literal_underscores() {
     let lexer = Lexer::from_text("1_000_000.212", "");
     let tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
-    assert_eq!(tokens.iter().next().unwrap().type_, TokenType::Float(1_000_000.212));
+    assert_eq!(
+        tokens.iter().next().unwrap().type_,
+        TokenType::Float(1_000_000.212)
+    );
 }
 
 #[test]
@@ -49,12 +58,17 @@ fn test_boolean_literals() {
 fn test_string_literals() {
     let lexer = Lexer::from_text("\"aaaaa\"", "");
     let tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
-    assert_eq!(tokens.iter().next().unwrap().type_, TokenType::String("aaaaa".to_string()));
+    assert_eq!(
+        tokens.iter().next().unwrap().type_,
+        TokenType::String("aaaaa".to_string())
+    );
 }
 
 #[test]
 #[should_panic]
 fn test_invalid_input() {
     let lexer = Lexer::from_text("@#%", "");
-    lexer.for_each(|t| {t.unwrap();});
+    lexer.for_each(|t| {
+        t.unwrap();
+    });
 }

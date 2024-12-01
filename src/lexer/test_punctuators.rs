@@ -1,5 +1,5 @@
 #[cfg(test)]
-use crate::lexer::{Lexer, tokens::TokenType};
+use crate::lexer::{tokens::TokenType, Lexer};
 
 #[test]
 fn test_punctuator_lparen() {
