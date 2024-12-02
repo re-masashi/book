@@ -798,7 +798,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                                 .build_int_compare(
                                                     IntPredicate::EQ,
                                                     lval.into_int_value(),
-                                                    self.context.i32_type().const_zero().into(),
+                                                    self.context.i32_type().const_zero(),
                                                     "eqtmp",
                                                 )
                                                 .unwrap()
