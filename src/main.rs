@@ -4,6 +4,8 @@ use book::{
     parser::Parser,
     Cli, Commands,
 };
+use log::{trace, LevelFilter};
+use owo_colors::OwoColorize;
 use std::{
     collections::HashMap,
     process::{self, Command},
@@ -19,29 +21,31 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // println!("Value for config: {}", config_path.display());
     }
 
-    match cli.debug {
-        0 => {}
-        _ => todo!(),
-    }
+    env_logger::builder()
+        .format_timestamp(None)
+        .format_module_path(false)
+        .filter_level(match cli.debug {
+            0 => LevelFilter::Warn,
+            1 => LevelFilter::Debug,
+            _ => LevelFilter::Trace,
+        })
+        .init();
 
     match &cli.command {
-        Some(Commands::Run { file }) => {
+        Commands::Run { file } => {
             build_file(file)?;
             run_file(file)?;
         }
-        Some(Commands::Build { file }) => {
+        Commands::Build { file } => {
             build_file(file)?;
         }
-        None => {}
     }
-
-    // println!("Size of Literal: {:?}", std::mem::size_of::<Literal>());
-    // println!("Size of TypedNode: {:?}", std::mem::size_of::<TypedNode>());
 
     Ok(())
 }
 
 fn build_file(source_path: &String) -> Result<(), Box<dyn std::error::Error>> {
+    trace!("`{source_path}` File is being read");
     let lexer = Lexer::from_file(source_path)?;
     let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
     tokens.push(Token {
@@ -55,28 +59,31 @@ fn build_file(source_path: &String) -> Result<(), Box<dyn std::error::Error>> {
     let mut env = TypeEnv(HashMap::new());
     let mut substitutions = HashMap::new();
 
+    trace!("Parsing started");
     let ast = match parser.parse_program() {
         Ok(ast) => ast,
         Err(e) => {
             parser.error(e);
-            // eprintln!("parser error encountered. quitting!");
             process::exit(0);
         }
     };
+    trace!("Typechecking started");
     let typed_ast = env.node_to_type(&ast, &mut substitutions);
-    // println!("AST (pre-opt imization): {:#?}", ast);
 
-    // optimise_ast::optimise_node(&mut ast);
-    //println!("AST (post-optimization): {:#?}", ast);
-
+    trace!("Creating inkwell context");
     let context = inkwell::context::Context::create();
     let mut generator = IRGenerator::new(&context, source_path.to_string());
+
+    trace!("Starting codegen");
     generator.gen_program(&typed_ast)?;
+    let exec_name = &(source_path.to_owned()[..=source_path.len() - 4].to_string() + ".out");
+    println!("executable `{}` created successfully", exec_name.green());
     Ok(())
 }
 
 fn run_file(source_path: &str) -> Result<(), Box<dyn std::error::Error>> {
     let exec_name = &(source_path.to_owned()[..=source_path.len() - 4].to_string() + ".out");
+    println!("running `{}`", exec_name.green());
     Command::new(exec_name)
         .status()
         .expect("failed to execute process");

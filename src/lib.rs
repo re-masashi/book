@@ -29,7 +29,7 @@ pub struct Cli {
     pub debug: u8,
 
     #[command(subcommand)]
-    pub command: Option<Commands>,
+    pub command: Commands,
 }
 
 #[derive(Subcommand)]

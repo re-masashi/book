@@ -11,6 +11,7 @@ use inkwell::values::{
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
 use inkwell::{FloatPredicate, IntPredicate};
+use log::debug;
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -137,7 +138,7 @@ impl<'ctx> IRGenerator<'ctx> {
     }
 
     fn print_ir(&self) {
-        println!("{}", self.module.print_to_string().to_string());
+        debug!("\n{}", self.module.print_to_string().to_string());
     }
 
     fn declare_gc_functions(&self) {

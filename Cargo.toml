@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-clap = { version = "4.5.21", features = ["derive"] }
+clap = { version = "4.5.21", features = ["color", "derive"] }
+env_logger = "0.11.5"
 inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "master", features = ["llvm18-0", "llvm18-0-prefer-dynamic"] }
+log = "0.4.22"
 owo-colors = "4.1.0"

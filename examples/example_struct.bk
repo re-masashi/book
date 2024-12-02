@@ -10,5 +10,3 @@ end
 
 # use the constructor created along with the struct
 let x: Person = Person(17, "masashi")
-let age: int = x.age
-println(age)

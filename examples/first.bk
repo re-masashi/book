@@ -1,7 +1,7 @@
 use "examples/example_struct.bk"
 use "examples/math.bk"
 
-extern run_socket_server(str, int, ptr,) -> int
+extern run_socket_server(int, int, ptr,) -> int
 extern strcmp(str, str,) -> int
 
 struct Response
@@ -18,8 +18,9 @@ end
 
 def handler(req: str) -> Response do
 	print("OK\n")
-	let x: int = strcmp(req, "exit")
-	Response("hello", if strcmp(req, "exit")==0 then 1 else 0)
+	if strcmp(req, "exit\n")==0 then
+		println("closing client connection")
+	Response(">", if strcmp(req, "exit\n")==0 then 1 else 0)
 end
 
-println(count_to_1M(1))
+run_socket_server(0, 8000, handler)
