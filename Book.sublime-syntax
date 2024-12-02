@@ -24,7 +24,7 @@ contexts:
     # strings in YAML. When using single quoted strings, only single quotes
     # need to be escaped: this is done by using two single quotes next to each
     # other.
-    - match: '\b(if|else|for|while|do|end|then|let|use|extern)\b'
+    - match: '\b(if|else|for|while|do|end|then|let|use|extern|return)\b'
       scope: keyword.control.book
 
     - match: '\b(int|float|str|ptr)\b'

@@ -142,6 +142,7 @@ pub enum TypedExpr<'a> {
     Index(Box<TypedExpr<'a>>, Box<TypedExpr<'a>>, Arc<Type>),
     StructAccess(Box<TypedExpr<'a>>, Cow<'a, str>, Arc<Type>),
     Return(Box<TypedExpr<'a>>, Arc<Type>),
+    Tuple(Vec<TypedExpr<'a>>, Arc<Type>),
 }
 
 pub struct TypeEnv(pub HashMap<String, Arc<Type>>);
@@ -182,6 +183,7 @@ pub enum Expr<'a> {
     Index(Box<Expr<'a>>, Box<Expr<'a>>), // value, index
     StructAccess(Box<Expr<'a>>, Cow<'a, str>),
     Return(Box<Expr<'a>>),
+    Tuple(Vec<Expr<'a>>),
 }
 
 #[derive(Debug)]
@@ -228,6 +230,7 @@ pub enum Type {
     Trait(String), // a specified trait bound
     Function(Vec<Arc<Type>>, Arc<Type>),
     Struct(String, Vec<String>, Vec<(String, Arc<Type>)>),
+    Tuple(Vec<Arc<Type>>)
 }
 
 impl Type {
@@ -258,6 +261,7 @@ impl Type {
             )),
             Type::Struct(..) => self.clone().into(),
             Type::Trait(_) => self.clone().into(),
+            Type::Tuple(_) => self.clone().into(),
         }
     }
 }
@@ -293,9 +297,9 @@ impl TypeVariable {
 
                 false
             }
-            Type::Function(_, _) => todo!(),
-            Type::Struct(_, _, _) => todo!(),
-            Type::Trait(_) => todo!(),
+            // Type::Function(_, _) => todo!(),
+            // Type::Struct(_, _, _) => todo!(),
+            _ => todo!(),
         }
     }
 }
@@ -353,6 +357,15 @@ fn unify(left: Arc<Type>, right: Arc<Type>, substitutions: &mut HashMap<TypeVari
             assert!(name == name2);
             assert!(generics.len() == generics2.len());
             assert!(fields.len() == fields2.len());
+            for (i, (_, field)) in fields.iter().enumerate() {
+                unify(field.clone(), fields2[i].1.clone(), substitutions)
+            }
+        }
+        (Type::Tuple(fields), Type::Tuple(fields2)) => {
+            assert!(fields.len() == fields2.len());
+            for (i, field) in fields.iter().enumerate() {
+                unify(field.clone(), fields2[i].clone(), substitutions)
+            }
         }
         (_, Type::Struct(..)) | (Type::Struct(..), _) => {
             panic!("invalid");
@@ -396,6 +409,7 @@ pub fn dosumn() {
                 Type::Function(_, _) => format!("fn{}", i),
                 Type::Struct(..) => "struct".to_string(),
                 Type::Trait(t) => format!("Trait {t}"),
+                Type::Tuple(..) => "tuple".to_string(),
             }
         );
     }

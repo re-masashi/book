@@ -1399,6 +1399,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                                 todo!()
                                             }
                                             Type::Trait(_) => todo!(),
+                                            Type::Tuple(_) => todo!(),
                                         }
                                     }
                                     IRType::BuiltIn => todo!(),
@@ -1538,6 +1539,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                                 todo!()
                                             }
                                             Type::Trait(_) => todo!(),
+                                            Type::Tuple(_) => todo!(),
                                         }
                                     }
                                     IRType::BuiltIn => todo!(),
@@ -1651,6 +1653,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                                 todo!()
                                             }
                                             Type::Trait(_) => todo!(),
+                                            Type::Tuple(_) => todo!(),
                                         }
                                     }
                                     IRType::BuiltIn => todo!(),
@@ -2013,6 +2016,7 @@ impl<'ctx> IRGenerator<'ctx> {
                     IRType::Returned(Box::new(ty)),
                 ))
             }
+            TypedExpr::Tuple(..)=>todo!(),
         }
     }
 
@@ -2088,5 +2092,6 @@ fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
         TypedExpr::Index(_, _, ty) => ty.clone(),
         TypedExpr::StructAccess(_, _, ty) => ty.clone(),
         TypedExpr::Return(_, ty) => ty.clone(),
+        TypedExpr::Tuple(_, ty) => ty.clone(),
     }
 }

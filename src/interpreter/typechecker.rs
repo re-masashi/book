@@ -178,6 +178,7 @@ impl<'a> TypeEnv {
                         todo!()
                     }
                     Type::Trait(..) => todo!(),
+                    Type::Tuple(..) => todo!(),
                 }
             }
             Expr::While(cond, body) => {
@@ -309,6 +310,27 @@ impl<'a> TypeEnv {
             Expr::Return(expr) => {
                 let (val, ty) = self.expr_to_type(expr, substitutions);
                 return (TypedExpr::Return(Box::new(val), ty.clone()), ty.clone());
+            }
+            Expr::Tuple(vals) => {
+                if vals.is_empty() {
+                    let type_ = tconst!("Array", tvar!(self.0.len() + 1));
+                    return (TypedExpr::Array(vec![], type_.clone()), type_);
+                }
+                if vals.len() == 1 {
+                    let (val, val_type) = self.expr_to_type(&vals[0], substitutions);
+                    let type_ = tconst!("Array", val_type);
+                    return (TypedExpr::Array(vec![val], type_.clone()), type_);
+                } else {
+                    let (_val, mut val_type) = self.expr_to_type(&vals[0], substitutions);
+                    let mut typed_vals = vec![];
+                    for val in &vals[1..] {
+                        let (typed_val, val_type_) = self.expr_to_type(val, substitutions);
+                        unify(val_type, val_type_.clone(), substitutions);
+                        val_type = val_type_;
+                        typed_vals.push(typed_val);
+                    }
+                    return (TypedExpr::Tuple(typed_vals, val_type.clone()), val_type);
+                }
             }
         };
         let substituted_expr = Self::substitute_type_vars_in_typed_expr(typed_expr, substitutions);
@@ -561,6 +583,13 @@ impl<'a> TypeEnv {
             }
             Type::Struct(..) => ty,
             Type::Trait(..) => ty,
+            Type::Tuple(vals) => {
+                let mut newvals = vec![];
+                for val in vals {
+                    newvals.push(Self::substitute_type_vars(val.clone(), substitutions))
+                }
+                Type::Tuple(newvals).into()
+            }
         }
     }
 
@@ -699,6 +728,14 @@ impl<'a> TypeEnv {
                 )),
                 Self::substitute_type_vars(ty, substitutions),
             ),
+            TypedExpr::Tuple(values, ty) => {
+                let new_vals = values
+                    .into_iter()
+                    .map(|val| Self::substitute_type_vars_in_typed_expr(val, substitutions))
+                    .collect();
+                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                TypedExpr::Tuple(new_vals, new_ty)
+            }
         }
     }
 
@@ -758,5 +795,6 @@ fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
         TypedExpr::Index(_, _, ty) => ty.clone(),
         TypedExpr::StructAccess(_, _, ty) => ty.clone(),
         TypedExpr::Return(_, ty) => ty.clone(),
+        TypedExpr::Tuple(_, ty) => ty.clone(),
     }
 }

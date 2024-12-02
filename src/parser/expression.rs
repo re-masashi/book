@@ -214,8 +214,8 @@ impl<'a> Parser<'_> {
                 ));
             }
         }
-        todo!()
-        // Ok(Expr::Array(args))
+        // todo!()
+        Ok(Expr::Tuple(vals))
     }
 
     fn parse_if(&mut self) -> Result<Expr<'a>> {
