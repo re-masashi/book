@@ -21,6 +21,7 @@ pub enum TokenType {
     Struct,
     Extern,
     Enum,
+    Return,
     True,
     False,
 
@@ -91,6 +92,7 @@ impl std::fmt::Display for TokenType {
                 TokenType::Extern => "extern".to_string(),
                 TokenType::Struct => "struct".to_string(),
                 TokenType::Enum => "enum".to_string(),
+                TokenType::Return => "return".to_string(),
                 TokenType::True => "true".to_string(),
                 TokenType::False => "false".to_string(),
 

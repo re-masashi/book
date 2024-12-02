@@ -59,6 +59,24 @@ extern "C" {
         return str;
     }
 
+    char* concat(const char *s1, const char *s2)
+    {
+        char *result = (char*)GC_malloc(strlen(s1) + strlen(s2) + 1); // +1 for the null-terminator
+        strcpy(result, s1);
+        strcat(result, s2);
+        return result;
+    }
+
+    char* stringrepeat(const char *s, const int n)
+    {
+        char *result = (char*)GC_malloc(strlen(s)*n+ 1); // +1 for null-terminator
+        for (int i = 0; i < n; ++i)
+        {
+            strcpy(result, s);
+        }
+        return result;
+    }
+
     int wait(int duration)
     {
         time_t start = time(NULL);

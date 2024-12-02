@@ -51,6 +51,7 @@ pub enum IRType<'ctx> {
     Simple(BasicTypeEnum<'ctx>),
     PolyMorph, // no need to store all the data
     BuiltIn,   // functions such as type().
+    Returned(Box<IRType<'ctx>>),
 }
 
 impl<'ctx> IRType<'ctx> {
@@ -61,6 +62,7 @@ impl<'ctx> IRType<'ctx> {
             IRType::Simple(v) => (*v).into(),
             IRType::PolyMorph => todo!(),
             IRType::BuiltIn => todo!(),
+            IRType::Returned(..) => todo!(),
         }
     }
 
@@ -71,6 +73,7 @@ impl<'ctx> IRType<'ctx> {
             IRType::Simple(v) => *v,
             IRType::PolyMorph => todo!(),
             IRType::BuiltIn => todo!(),
+            IRType::Returned(..) => todo!(),
         }
     }
 }
@@ -91,6 +94,7 @@ pub enum IRValue<'ctx> {
         Arc<Type>,
     ),
     BuiltIn(String),
+    Returned(Box<IRValue<'ctx>>),
 }
 
 impl<'ctx> IRValue<'ctx> {
@@ -101,6 +105,7 @@ impl<'ctx> IRValue<'ctx> {
             IRValue::Simple(v) => (*v).into(),
             IRValue::PolyMorph(..) => todo!(),
             IRValue::BuiltIn(..) => todo!(),
+            IRValue::Returned(..) => todo!(),
         }
     }
 
@@ -111,6 +116,7 @@ impl<'ctx> IRValue<'ctx> {
             IRValue::Simple(v) => *v,
             IRValue::PolyMorph(..) => todo!(),
             IRValue::BuiltIn(..) => todo!(),
+            IRValue::Returned(..) => todo!(),
         }
     }
 }
@@ -171,6 +177,10 @@ impl<'ctx> IRGenerator<'ctx> {
             "println".to_string(),
             (IRValue::BuiltIn("println".to_string()), IRType::BuiltIn),
         );
+        self.variables.insert(
+            "str".to_string(),
+            (IRValue::BuiltIn("str".to_string()), IRType::BuiltIn),
+        );
 
         self.gen_extern("printint".to_string(), vec![t_int!()], t_int!())?;
         self.gen_extern("printstr".to_string(), vec![t_str!()], t_str!())?;
@@ -179,6 +189,14 @@ impl<'ctx> IRGenerator<'ctx> {
         self.gen_extern("int_to_str".to_string(), vec![t_int!()], t_str!())?;
         self.gen_extern("float_to_str".to_string(), vec![t_float!()], t_str!())?;
         self.gen_extern("bool_to_str".to_string(), vec![t_int!()], t_str!())?;
+
+        self.gen_extern("concat".to_string(), vec![t_str!(), t_str!()], t_str!())?;
+        self.gen_extern("strcmp".to_string(), vec![t_str!(), t_str!()], t_int!())?;
+        self.gen_extern(
+            "stringrepeat".to_string(),
+            vec![t_str!(), t_int!()],
+            t_str!(),
+        )?;
 
         match node {
             TypedNode::Program(nodes) => {
@@ -346,7 +364,26 @@ impl<'ctx> IRGenerator<'ctx> {
         };
         self.module
             .run_passes(
-                "tailcallelim,mem2reg,bdce,dce,dse",
+                "tailcallelim,\
+                mem2reg,\
+                bdce,\
+                dce,\
+                dse,\
+                instcombine,\
+                consthoist,\
+                loop-deletion,\
+                loop-data-prefetch,\
+                loop-distribute,\
+                loop-flatten,\
+                loop-fusion,\
+                loop-load-elim,\
+                loop-reduce,\
+                loop-unroll,\
+                loop-rotate,\
+                loop-simplify,\
+                loop-sink,\
+                loop-vectorize,\
+                unify-loop-exits",
                 &target_machine,
                 inkwell::passes::PassBuilderOptions::create(),
             )
@@ -503,21 +540,28 @@ impl<'ctx> IRGenerator<'ctx> {
 
             let (returned_val, returned_type) = self.gen_expression(expr, function)?;
 
-            if match returned_type {
-                IRType::Simple(t) => match t {
-                    BasicTypeEnum::ArrayType(_) => self
-                        .builder
-                        .build_aggregate_return(&[returned_val.as_basic_enum(self.context)]),
-                    _ => self
-                        .builder
-                        .build_return(Some(&returned_val.as_basic_enum(self.context))),
-                },
+            match returned_type {
+                IRType::Simple(t) => {
+                    if (match t {
+                        BasicTypeEnum::ArrayType(_) => self
+                            .builder
+                            .build_aggregate_return(&[returned_val.as_basic_enum(self.context)]),
+                        _ => self
+                            .builder
+                            .build_return(Some(&returned_val.as_basic_enum(self.context))),
+                    })
+                    .is_err()
+                    {
+                        return Err(
+                            "something went wrong during function return generation.".to_string()
+                        );
+                    };
+                }
+                IRType::Returned(_) => {
+                    // no-op
+                }
                 _ => todo!(),
             }
-            .is_err()
-            {
-                return Err("something went wrong during function return generation.".to_string());
-            };
 
             // Verify the function
             if !function.verify(true) {
@@ -720,6 +764,108 @@ impl<'ctx> IRGenerator<'ctx> {
             TypedExpr::BinaryOp(lhs, op, rhs, _type_) => {
                 let (lhs_val, lhs_type) = self.gen_expression(&(lhs.clone()), function)?;
                 let (rhs_val, rhs_type) = self.gen_expression(&(rhs.clone()), function)?;
+
+                if let (IRValue::Simple(_), IRValue::Simple(_)) = (lhs_val.clone(), rhs_val.clone())
+                {
+                    let argsv: [BasicMetadataValueEnum; 2] = [
+                        lhs_val.as_meta_enum(self.context),
+                        rhs_val.as_meta_enum(self.context),
+                    ];
+                    match (
+                        get_type_from_typed_expr(&lhs.clone()).as_ref(),
+                        get_type_from_typed_expr(&lhs.clone()).as_ref(),
+                    ) {
+                        (Type::Constructor(c1), Type::Constructor(c2))
+                            if c1.name == "str" && c2.name == "str" =>
+                        {
+                            match op {
+                                BinaryOperator::Equal => {
+                                    let function_to_call =
+                                        self.module.get_function("strcmp").unwrap();
+                                    let lval = match self.builder.build_call(
+                                        function_to_call,
+                                        &argsv,
+                                        "strcmptemp",
+                                    ) {
+                                        Ok(call_site_value) => {
+                                            call_site_value.try_as_basic_value().left().unwrap()
+                                        }
+                                        Err(e) => return Err(e.to_string()),
+                                    };
+                                    return Ok((
+                                        IRValue::Simple(
+                                            self.builder
+                                                .build_int_compare(
+                                                    IntPredicate::EQ,
+                                                    lval.into_int_value(),
+                                                    self.context.i32_type().const_zero().into(),
+                                                    "eqtmp",
+                                                )
+                                                .unwrap()
+                                                .into(),
+                                        ),
+                                        IRType::Simple(self.context.i32_type().into()),
+                                    ));
+                                }
+                                BinaryOperator::Add => {
+                                    let function_to_call =
+                                        self.module.get_function("concat").unwrap();
+                                    return match self.builder.build_call(
+                                        function_to_call,
+                                        &argsv,
+                                        "strcmptemp",
+                                    ) {
+                                        Ok(call_site_value) => Ok((
+                                            IRValue::Simple(
+                                                call_site_value
+                                                    .try_as_basic_value()
+                                                    .left()
+                                                    .unwrap(),
+                                            ),
+                                            IRType::Simple(
+                                                self.context.ptr_type(AddressSpace::from(0)).into(),
+                                            ), // str
+                                        )),
+                                        Err(e) => Err(e.to_string()),
+                                    };
+                                }
+                                // BinaryOperator::Less => {}
+                                // BinaryOperator::Greater => {}
+                                _ => return Err("invalid operator for strings.".to_string()),
+                            }
+                        }
+                        (Type::Constructor(c1), Type::Constructor(c2))
+                            if c1.name == "str" && c2.name == "int" =>
+                        {
+                            match op {
+                                BinaryOperator::Mul => {
+                                    let function_to_call =
+                                        self.module.get_function("stringrepeat").unwrap();
+                                    return match self.builder.build_call(
+                                        function_to_call,
+                                        &argsv,
+                                        "strcmptemp",
+                                    ) {
+                                        Ok(call_site_value) => Ok((
+                                            IRValue::Simple(
+                                                call_site_value
+                                                    .try_as_basic_value()
+                                                    .left()
+                                                    .unwrap(),
+                                            ),
+                                            IRType::Simple(
+                                                self.context.ptr_type(AddressSpace::from(0)).into(),
+                                            ), // str
+                                        )),
+                                        Err(e) => Err(e.to_string()),
+                                    };
+                                }
+                                _ => return Err("invalid operator for string and int".to_string()),
+                            }
+                        }
+                        _ => {}
+                    }
+                }
 
                 let lhs_type = lhs_type.as_basic_enum(self.context);
                 let rhs_type = rhs_type.as_basic_enum(self.context);
@@ -1134,6 +1280,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                     IRType::Function(..) | IRType::PolyMorph => {
                                         "<function>".to_string()
                                     }
+                                    IRType::Returned(..) => "()".to_string(),
                                 };
                                 Ok((
                                     self.gen_literal(&Literal::String(typestring.into())).0,
@@ -1258,7 +1405,9 @@ impl<'ctx> IRGenerator<'ctx> {
                                     IRType::Struct(name, ..) => Ok(self.gen_literal(
                                         &Literal::String(format!("<{}>", name).into()),
                                     )),
-                                    IRType::Function(..) | IRType::PolyMorph => todo!(),
+                                    IRType::Function(..)
+                                    | IRType::PolyMorph
+                                    | IRType::Returned(..) => todo!(),
                                 }?
                                 else {
                                     unreachable!()
@@ -1395,7 +1544,9 @@ impl<'ctx> IRGenerator<'ctx> {
                                     IRType::Struct(name, ..) => Ok(self.gen_literal(
                                         &Literal::String(format!("<{}>", name).into()),
                                     )),
-                                    IRType::Function(..) | IRType::PolyMorph => todo!(),
+                                    IRType::Function(..)
+                                    | IRType::PolyMorph
+                                    | IRType::Returned(..) => todo!(),
                                 }?
                                 else {
                                     unreachable!()
@@ -1415,6 +1566,110 @@ impl<'ctx> IRGenerator<'ctx> {
                                     )),
                                     Err(e) => Err(e.to_string()),
                                 }
+                            }
+                            "str" => {
+                                let ret = tconst!("str");
+                                if args.len() != 1 {
+                                    return Err("Invalid number of args.".to_string());
+                                }
+                                let arg = &args[0];
+                                let (compiled_arg, ty) = self.gen_expression(arg, function)?;
+                                let (IRValue::Simple(str_val), _) = match ty {
+                                    IRType::Simple(_) => {
+                                        match get_type_from_typed_expr(arg).as_ref() {
+                                            Type::Constructor(c) if c.name == "int" => {
+                                                match self.builder.build_call(
+                                                    self.module.get_function("int_to_str").unwrap(),
+                                                    &[compiled_arg.as_meta_enum(self.context)],
+                                                    "calltmp",
+                                                ) {
+                                                    Ok(call_site_value) => Ok((
+                                                        IRValue::Simple(
+                                                            call_site_value
+                                                                .try_as_basic_value()
+                                                                .left()
+                                                                .unwrap(),
+                                                        ),
+                                                        self.type_to_llvm(ret.clone()),
+                                                    )),
+                                                    Err(e) => Err(e.to_string()),
+                                                }
+                                            }
+                                            Type::Constructor(c) if c.name == "float" => {
+                                                match self.builder.build_call(
+                                                    self.module
+                                                        .get_function("float_to_str")
+                                                        .unwrap(),
+                                                    &[compiled_arg.as_meta_enum(self.context)],
+                                                    "calltmp",
+                                                ) {
+                                                    Ok(call_site_value) => Ok((
+                                                        IRValue::Simple(
+                                                            call_site_value
+                                                                .try_as_basic_value()
+                                                                .left()
+                                                                .unwrap(),
+                                                        ),
+                                                        self.type_to_llvm(ret.clone()),
+                                                    )),
+                                                    Err(e) => Err(e.to_string()),
+                                                }
+                                            }
+                                            Type::Constructor(c) if c.name == "bool" => {
+                                                match self.builder.build_call(
+                                                    self.module
+                                                        .get_function("bool_to_str")
+                                                        .unwrap(),
+                                                    &[compiled_arg.as_meta_enum(self.context)],
+                                                    "calltmp",
+                                                ) {
+                                                    Ok(call_site_value) => Ok((
+                                                        IRValue::Simple(
+                                                            call_site_value
+                                                                .try_as_basic_value()
+                                                                .left()
+                                                                .unwrap(),
+                                                        ),
+                                                        self.type_to_llvm(ret.clone()),
+                                                    )),
+                                                    Err(e) => Err(e.to_string()),
+                                                }
+                                            }
+                                            Type::Constructor(c) if c.name == "str" => {
+                                                Ok((compiled_arg.clone(), ty))
+                                            }
+                                            Type::Constructor(c) => Ok(self.gen_literal(
+                                                &Literal::String(format!("<{}>", c.name).into()),
+                                            )),
+                                            Type::Struct(name, ..) => Ok(self.gen_literal(
+                                                &Literal::String(format!("<{}>", name).into()),
+                                            )),
+                                            Type::Function(..) => Ok(self.gen_literal(
+                                                &Literal::String("<function>".to_string().into()),
+                                            )),
+                                            Type::Variable(_v) => {
+                                                todo!()
+                                            }
+                                            Type::Trait(_) => todo!(),
+                                        }
+                                    }
+                                    IRType::BuiltIn => todo!(),
+                                    IRType::Struct(name, ..) => Ok(self.gen_literal(
+                                        &Literal::String(format!("<{}>", name).into()),
+                                    )),
+                                    IRType::Function(..)
+                                    | IRType::PolyMorph
+                                    | IRType::Returned(..) => todo!(),
+                                }?
+                                else {
+                                    unreachable!()
+                                };
+                                Ok((
+                                    IRValue::Simple(str_val),
+                                    IRType::Simple(
+                                        self.context.ptr_type(AddressSpace::from(0)).into(),
+                                    ),
+                                ))
                             }
                             _ => unreachable!(),
                         }
@@ -1617,8 +1872,38 @@ impl<'ctx> IRGenerator<'ctx> {
                 // global_array.set_initializer(&array_value);
                 // Ok(global_array.as_pointer_value().as_basic_value_enum())
             }
-            TypedExpr::While(..) => {
-                panic!("ive not decided if i want a `while` loop in this language yet")
+            TypedExpr::While(cond, body, _type_) => {
+                // Create basic blocks for the loop
+                let cond_bb = self.context.append_basic_block(function, "while_cond");
+                let body_bb = self.context.append_basic_block(function, "while_body");
+                let after_bb = self.context.append_basic_block(function, "after_while");
+
+                // Branch to the condition block
+                self.builder.build_unconditional_branch(cond_bb).unwrap();
+
+                // Condition block
+                self.builder.position_at_end(cond_bb);
+                let (cond_val, _) = self.gen_expression(cond, function)?;
+                self.builder
+                    .build_conditional_branch(
+                        cond_val.as_basic_enum(self.context).into_int_value(),
+                        body_bb,
+                        after_bb,
+                    )
+                    .unwrap();
+
+                // Loop body block
+                self.builder.position_at_end(body_bb);
+                self.gen_expression(body, function)?;
+                self.builder.build_unconditional_branch(cond_bb).unwrap(); // Loop back to the condition
+
+                // After loop block
+                self.builder.position_at_end(after_bb);
+
+                Ok((
+                    IRValue::Simple(self.context.i32_type().const_zero().into()),
+                    IRType::Simple(self.context.i32_type().into()),
+                ))
             }
             TypedExpr::Do(expressions, type_) => {
                 let mut exprs = vec![];
@@ -1627,7 +1912,14 @@ impl<'ctx> IRGenerator<'ctx> {
                 expressions_.append(&mut expressions.clone());
 
                 for expr in expressions_ {
-                    exprs.push(self.gen_expression(&expr, function)?.0)
+                    // debug!("{:?}", expr);
+                    let compiled_expr = self.gen_expression(&expr, function)?;
+                    match expr {
+                        TypedExpr::Return(..) => return Ok(compiled_expr),
+                        _ => {
+                            exprs.push(compiled_expr.0);
+                        }
+                    }
                 }
 
                 match exprs.last() {
@@ -1708,6 +2000,19 @@ impl<'ctx> IRGenerator<'ctx> {
                 }
                 Err("no such field found in the given struct".to_string())
             }
+            TypedExpr::Return(expr, _return_type) => {
+                let (val, ty) = self.gen_expression(expr, function)?;
+
+                // Create a return instruction
+                self.builder
+                    .build_return(Some(&val.as_basic_enum(self.context)))
+                    .unwrap();
+
+                Ok((
+                    IRValue::Returned(Box::new(val)),
+                    IRType::Returned(Box::new(ty)),
+                ))
+            }
         }
     }
 
@@ -1782,5 +2087,6 @@ fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
         TypedExpr::Do(_, ty) => ty.clone(),
         TypedExpr::Index(_, _, ty) => ty.clone(),
         TypedExpr::StructAccess(_, _, ty) => ty.clone(),
+        TypedExpr::Return(_, ty) => ty.clone(),
     }
 }

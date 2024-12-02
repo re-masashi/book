@@ -1,6 +1,8 @@
 use crate::interpreter::*;
 use crate::{t_int, t_str, tconst, tvar};
 
+use log::trace;
+
 impl<'a> TypeEnv {
     pub fn expr_to_type(
         &mut self,
@@ -190,6 +192,7 @@ impl<'a> TypeEnv {
             Expr::BinaryOp(lhs, op, rhs) => {
                 let (lhs, mut lhs_type) = self.expr_to_type(lhs, substitutions);
                 let (rhs, rhs_type) = self.expr_to_type(rhs, substitutions);
+
                 unify(lhs_type.clone(), rhs_type.clone(), substitutions);
 
                 match (lhs_type.as_ref(), rhs_type.as_ref()) {
@@ -303,6 +306,10 @@ impl<'a> TypeEnv {
                     tvar!(self.0.len()),
                 )
             }
+            Expr::Return(expr) => {
+                let (val, ty) = self.expr_to_type(expr, substitutions);
+                return (TypedExpr::Return(Box::new(val), ty.clone()), ty.clone());
+            }
         };
         let substituted_expr = Self::substitute_type_vars_in_typed_expr(typed_expr, substitutions);
         let substituted_ty = Self::substitute_type_vars(ty, substitutions);
@@ -322,9 +329,14 @@ impl<'a> TypeEnv {
             "print".to_string(),
             Type::Function(vec![t_str!()], t_int!()).into(),
         );
+        self.0.insert(
+            "println".to_string(),
+            Type::Function(vec![t_str!()], t_int!()).into(),
+        );
         let typed_node = match node {
             Node::Function(name, args, ret, ty) => match ty {
                 Some(ty) => {
+                    trace!("{:?}", ty);
                     let annoted_type = Type::Constructor(TypeConstructor {
                         name: ty.name.to_string(),
                         generics: ty
@@ -680,6 +692,13 @@ impl<'a> TypeEnv {
                 TypedExpr::Index(new_arr, new_idx, new_ty)
             }
             TypedExpr::StructAccess(_, _, _) => typed_expr,
+            TypedExpr::Return(expr, ty) => TypedExpr::Return(
+                Box::new(Self::substitute_type_vars_in_typed_expr(
+                    *expr,
+                    substitutions,
+                )),
+                Self::substitute_type_vars(ty, substitutions),
+            ),
         }
     }
 
@@ -738,5 +757,6 @@ fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
         TypedExpr::Do(_, ty) => ty.clone(),
         TypedExpr::Index(_, _, ty) => ty.clone(),
         TypedExpr::StructAccess(_, _, ty) => ty.clone(),
+        TypedExpr::Return(_, ty) => ty.clone(),
     }
 }

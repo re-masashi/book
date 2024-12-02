@@ -141,6 +141,7 @@ pub enum TypedExpr<'a> {
     Do(Vec<TypedExpr<'a>>, Arc<Type>),
     Index(Box<TypedExpr<'a>>, Box<TypedExpr<'a>>, Arc<Type>),
     StructAccess(Box<TypedExpr<'a>>, Cow<'a, str>, Arc<Type>),
+    Return(Box<TypedExpr<'a>>, Arc<Type>),
 }
 
 pub struct TypeEnv(pub HashMap<String, Arc<Type>>);
@@ -180,6 +181,7 @@ pub enum Expr<'a> {
     Do(Vec<Expr<'a>>),
     Index(Box<Expr<'a>>, Box<Expr<'a>>), // value, index
     StructAccess(Box<Expr<'a>>, Cow<'a, str>),
+    Return(Box<Expr<'a>>),
 }
 
 #[derive(Debug)]
@@ -318,6 +320,11 @@ fn unify(left: Arc<Type>, right: Arc<Type>, substitutions: &mut HashMap<TypeVari
             for (left, right) in zip(generics1, generics2) {
                 unify(left.clone(), right.clone(), substitutions);
             }
+        }
+        (Type::Variable(v1 @ TypeVariable(..)), Type::Variable(v2 @ TypeVariable(..)))
+            if v1 == v2 =>
+        {
+            // both are equal
         }
         (_, Type::Variable(v @ TypeVariable(..))) => {
             if let Some(substitution) = substitutions.get(v) {

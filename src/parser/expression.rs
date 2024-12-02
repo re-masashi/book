@@ -71,6 +71,7 @@ impl<'a> Parser<'_> {
             TokenType::Minus => {
                 Expr::UnaryOp(UnaryOperator::Negate, Box::new(self.parse_expression()?))
             }
+            TokenType::Return => return Ok(Expr::Return(Box::new(self.parse_expression()?))),
             TokenType::Not => Expr::UnaryOp(UnaryOperator::Not, Box::new(self.parse_expression()?)),
             ref x => return Err(format!("expected a valid expression. found `{}`.", x)),
         };
@@ -127,6 +128,10 @@ impl<'a> Parser<'_> {
                 }
             };
             l_value = Expr::StructAccess(Box::new(l_value), field.into())
+        }
+
+        while let TokenType::Assign = unwrap_some!(self.tokens.peek()).type_ {
+            todo!()
         }
 
         while let TokenType::Plus

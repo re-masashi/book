@@ -10,17 +10,31 @@ struct Response
 end
 
 def count_to_1M(n: int) -> int do
-	if n < 1_000_000 then do
+	if n < 1_000_000 then
 		count_to_1M(n+1)
-	end
+	0
+end
+
+def count_to_1M_while() -> int do
+	let n = 0
+	while n < 1_000_000 then
+		let n = n+1 # i still dont have a syntax for n = n+1
 	0
 end
 
 def handler(req: str) -> Response do
 	print("OK\n")
-	if strcmp(req, "exit\n")==0 then
+	if req == "exit\n" then do
 		println("closing client connection")
-	Response(">", if strcmp(req, "exit\n")==0 then 1 else 0)
+		Response(">", 1)
+	end else do
+		println("replying")
+		Response(">", 0)
+	end
 end
 
-run_socket_server(0, 8000, handler)
+# run_socket_server(0, 8000, handler)
+let name = "john doe"
+println("hello "+name)
+let x: str = str(21) # type declaration issues
+println(x)
