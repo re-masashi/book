@@ -16,9 +16,8 @@ end
 
 def count_to_1M_while() -> bool do
 	let n = 0
-	while n < 1_000_000 then do
+	while n < 1_000_000 then
 		n = n+1 # i still dont have a syntax for n = n+1
-	end
 end
 
 def handler(req: str) -> Response do
@@ -33,8 +32,9 @@ def handler(req: str) -> Response do
 end
 
 # run_socket_server(0, 8000, handler)
-let name = "john doe"
 
-# return 0 ## return on top level to exit the program
+# return 0 ## return on top level to exit the program. shall i add it?
 
-count_to_1M_while()
+println(type("abcd"))
+println(type(11))
+

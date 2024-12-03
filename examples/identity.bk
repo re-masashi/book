@@ -1,0 +1,5 @@
+def identity(i)
+	i
+
+identity(1)
+identity(1.2)

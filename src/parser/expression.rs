@@ -82,10 +82,12 @@ impl<'a> Parser<'_> {
             // array index
             self.advance(); // eat '['
             let index = self.parse_expression();
-            l_value = Expr::Index(Box::new(l_value), Box::new(index?))
-        }
-        if let TokenType::RBrack = unwrap_some!(self.tokens.peek()).type_ {
-            self.advance(); // eat ']'
+            l_value = Expr::Index(Box::new(l_value), Box::new(index?));
+            if let TokenType::RBrack = unwrap_some!(self.tokens.peek()).type_ {
+                self.advance(); // eat ']'
+            }else{
+                return Err("unclosed delimiter ']' after array index.".to_string())
+            }
         }
 
         if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {

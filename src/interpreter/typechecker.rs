@@ -36,6 +36,8 @@ impl<'a> TypeEnv {
                 }
                 None => {
                     let (expr_typed, type_) = self.expr_to_type(value, substitutions);
+                    // println!("{:?}", type_);
+                    self.0.insert(name.to_string(), type_.clone());
                     (
                         TypedExpr::Let(
                             std::borrow::Cow::Borrowed(name),
@@ -257,15 +259,16 @@ impl<'a> TypeEnv {
                     let type_ = tconst!("Array", val_type);
                     return (TypedExpr::Array(vec![val], type_.clone()), type_);
                 } else {
-                    let (_val, mut val_type) = self.expr_to_type(&vals[0], substitutions);
-                    let mut typed_vals = vec![];
+                    let (val, mut val_type) = self.expr_to_type(&vals[0], substitutions);
+                    let type_ = tconst!("Array", val_type.clone());
+                    let mut typed_vals = vec![val];
                     for val in &vals[1..] {
                         let (typed_val, val_type_) = self.expr_to_type(val, substitutions);
                         unify(val_type, val_type_.clone(), substitutions);
                         val_type = val_type_;
                         typed_vals.push(typed_val);
                     }
-                    return (TypedExpr::Array(typed_vals, val_type.clone()), val_type);
+                    return (TypedExpr::Array(typed_vals, type_.clone()), type_);
                 }
             }
             Expr::Do(expressions) => {
@@ -290,11 +293,18 @@ impl<'a> TypeEnv {
                 }
             }
             Expr::Index(expression, index) => {
-                let (expr, _expr_type) = self.expr_to_type(expression, substitutions);
+                let (expr, expr_type) = self.expr_to_type(expression, substitutions);
                 let (index, _index_type) = self.expr_to_type(index, substitutions);
+                // println!("{:?}", expr);
+                let ty = match expr_type.as_ref() {
+                    Type::Constructor(c) if c.name == "Array" =>{
+                        c.generics[0].clone() // always works
+                    }
+                    ref c=>{todo!("add custom indexing types. {:?}", c)}
+                };
                 return (
-                    TypedExpr::Index(Box::new(expr), Box::new(index), tvar!(self.0.len() + 1)),
-                    tvar!(self.0.len()),
+                    TypedExpr::Index(Box::new(expr), Box::new(index), ty.clone()),
+                    ty,
                 );
             }
             Expr::StructAccess(struct_, field) => {

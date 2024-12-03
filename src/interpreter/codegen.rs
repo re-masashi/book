@@ -1836,44 +1836,50 @@ impl<'ctx> IRGenerator<'ctx> {
             TypedExpr::Array(elements, type_) => {
                 let element_type = match type_.as_ref() {
                     Type::Constructor(TypeConstructor {
-                        name: _,  // always equals array
-                        generics, // always equals [T],
+                        name: _,  // always equals "Array"
+                        generics, // always equals [T]
                         traits: _,
                     }) => generics[0].clone(),
-                    _ => unreachable!(),
+                    _ => return Err("Invalid type for array".to_string()),
                 };
 
-                let ty = self.type_to_llvm(element_type.clone());
-                let llvm_element_type = self.type_to_llvm(element_type).as_basic_enum(self.context);
-                let array_type = llvm_element_type.into_array_type();
+                // Convert the element type to LLVM type
+                let llvm_element_type = self.type_to_llvm(element_type);
+                let llvm_element_type_enum = llvm_element_type.as_basic_enum(self.context);
 
+                // Create array type
+                let array_type = llvm_element_type_enum.array_type(elements.len() as u32);
+
+                // Allocate memory for the array
                 let ptr = self.builder.build_alloca(array_type, "tmparray").unwrap();
 
-                elements.iter().enumerate().for_each(|(i, elem)| {
+                // Iterate over elements and store them in the array
+                for (i, elem) in elements.iter().enumerate() {
+                    // Generate code for the element expression
                     let expr = self
-                        .gen_expression(elem, function)
-                        .unwrap()
+                        .gen_expression(elem, function)?
                         .0
                         .as_basic_enum(self.context);
 
-                    let const_i = self.context.i64_type().const_int(i as u64, false);
+                    // Create constants for the GEP indexing (0 for the first dimension, i for the second dimension)
                     let const_0 = self.context.i64_type().const_zero();
+                    let const_i = self.context.i64_type().const_int(i as u64, false);
 
                     let inner_ptr = unsafe {
                         self.builder
                             .build_gep(
-                                llvm_element_type,
+                                llvm_element_type_enum,
                                 ptr,
-                                &[const_0, const_i],
-                                format!("elem_{}", i).as_str(),
-                            )
-                            .unwrap()
+                                &[const_i],
+                                &format!("elem_{}", i)
+                            ).unwrap()
                     };
 
                     self.builder.build_store(inner_ptr, expr).unwrap();
-                });
+                }
 
-                Ok((IRValue::Simple(ptr.into()), ty))
+                Ok((IRValue::Simple(ptr.into()), IRType::Simple(llvm_element_type_enum)))
+
                 // let global_array = self.module.add_global(array_type, Some(AddressSpace::Const), "array_global").unwrap();
                 // global_array.set_initializer(&array_value);
                 // Ok(global_array.as_pointer_value().as_basic_value_enum())
@@ -1953,45 +1959,33 @@ impl<'ctx> IRGenerator<'ctx> {
                     Some(v) => Ok((v.clone(), self.type_to_llvm(type_.clone()))),
                 }
             }
-            TypedExpr::Index(array, index, type_) => {
-                let array_val = self
-                    .gen_expression(array, function)?
+            TypedExpr::Index(array_expr, index_expr, type_) => {
+                println!("1");
+                let array_ptr = self
+                    .gen_expression(array_expr, function)?
                     .0
-                    .as_basic_enum(self.context);
-                let index_val = self
-                    .gen_expression(index, function)?
+                    .as_basic_enum(self.context)
+                    .into_pointer_value();
+                println!("2");
+                let index_value = self
+                    .gen_expression(index_expr, function)?
                     .0
-                    .as_basic_enum(self.context);
-
-                match array_val.get_type() {
-                    BasicTypeEnum::ArrayType(_) => {
-                        let indices = [
-                            self.context.i32_type().const_zero(),
-                            index_val.into_int_value(),
-                        ];
-                        Ok((
-                            IRValue::Simple(
-                                unsafe {
-                                    self.builder
-                                        .build_in_bounds_gep(
-                                            self.type_to_llvm(type_.clone())
-                                                .as_basic_enum(self.context),
-                                            array_val.into_pointer_value(),
-                                            &indices,
-                                            "index_access",
-                                        )
-                                        .unwrap()
-                                }
-                                .into(),
-                            ),
-                            self.type_to_llvm(type_.clone()),
-                        ))
-                    }
-                    _ => Err(format!(
-                        "Unsupported type for indexing: {:?}",
-                        array_val.get_type()
-                    )),
-                }
+                    .as_basic_enum(self.context)
+                    .into_int_value();
+                println!("3");
+                let index_type = self.context.i64_type();
+                println!("4");
+                let index_ptr = unsafe {
+                    self.builder
+                        .build_gep(
+                            self.type_to_llvm(type_.clone()).as_basic_enum(self.context),
+                            array_ptr, 
+                            &[index_value], 
+                            "element_ptr"
+                        ).unwrap()
+                };
+                
+                todo!()
             }
             TypedExpr::StructAccess(structref, field, _ty) => {
                 let (structref, structty) = self.gen_expression(structref, function)?;
@@ -2143,9 +2137,10 @@ impl<'ctx> IRGenerator<'ctx> {
                 "float" => IRType::Simple(self.context.f32_type().into()),
                 "double" => IRType::Simple(self.context.f64_type().into()),
                 "str" => IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into()),
+                "Array" => IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into()),
                 x => match self.structs.get(x) {
                     Some(_v) => IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into()),
-                    None => panic!("no such struct"),
+                    None => panic!("no such struct `{x}`"),
                 },
             },
             Type::Struct(_name, _, _fields) => {

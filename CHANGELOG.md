@@ -32,3 +32,12 @@ DD/MM/YYYY
 ## 2/12/2024
 	- Added tests for lexer and parser.
 	- Setup a GH actions workflow.
+
+## 3/12/2024
+	- Added while loop, return, break and continue.
+	- Added assignment expression.
+	- Updated syntax highlighting.
+
+## 4/12/2024
+	- Removed return, break and continue.
+	- Trying to rewrite the parser or work on array codegen. Terribly stuck.
