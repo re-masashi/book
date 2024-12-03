@@ -1,2 +1,7 @@
-let items = [1,2,3]
-println(items[0])
+let items = [
+	[1,2],
+	[2,3],
+	[3,4]
+]
+
+println(items[1][1])

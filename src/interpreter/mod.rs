@@ -182,7 +182,7 @@ pub enum Expr<'a> {
     Break,
     Continue,
     BinaryOp(Box<Expr<'a>>, BinaryOperator, Box<Expr<'a>>), // lhs, op, rhs
-    UnaryOp(UnaryOperator, Box<Expr<'a>>),               // op, val
+    UnaryOp(UnaryOperator, Box<Expr<'a>>),                  // op, val
     Array(Vec<Expr<'a>>),
     Do(Vec<Expr<'a>>),
     Index(Box<Expr<'a>>, Box<Expr<'a>>), // value, index
@@ -236,7 +236,7 @@ pub enum Type {
     Trait(String), // a specified trait bound
     Function(Vec<Arc<Type>>, Arc<Type>),
     Struct(String, Vec<String>, Vec<(String, Arc<Type>)>),
-    Tuple(Vec<Arc<Type>>)
+    Tuple(Vec<Arc<Type>>),
 }
 
 impl Type {

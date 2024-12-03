@@ -1,3 +1,4 @@
+use inkwell::basic_block::BasicBlock;
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -6,9 +7,9 @@ use inkwell::targets::{
 };
 use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, StructType};
 use inkwell::values::{
-    BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, StructValue,
+    BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, InstructionOpcode,
+    StructValue,
 };
-use inkwell::basic_block::BasicBlock;
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
 use inkwell::{FloatPredicate, IntPredicate};
@@ -36,7 +37,7 @@ pub struct IRGenerator<'ctx> {
     file: String,
     polymorphic_functions: HashMap<String, Vec<PolyMorphicFunction<'ctx>>>,
     builtins: Vec<IRValue<'ctx>>,
-    loop_bbs: Option<(BasicBlock<'ctx>,BasicBlock<'ctx>,)>,
+    loop_bbs: Option<(BasicBlock<'ctx>, BasicBlock<'ctx>)>,
 }
 
 pub struct PolyMorphicFunction<'ctx>(
@@ -365,32 +366,32 @@ impl<'ctx> IRGenerator<'ctx> {
             Ok(_) => {}
             Err(e) => return Err(format!("couldn't verify the module!. {}", e)),
         };
-        self.module
-            .run_passes(
-                "tailcallelim,\
-                mem2reg,\
-                bdce,\
-                dce,\
-                dse,\
-                instcombine,\
-                consthoist,\
-                loop-deletion,\
-                loop-data-prefetch,\
-                loop-distribute,\
-                loop-flatten,\
-                loop-fusion,\
-                loop-load-elim,\
-                loop-reduce,\
-                loop-unroll,\
-                loop-rotate,\
-                loop-simplify,\
-                loop-sink,\
-                loop-vectorize,\
-                unify-loop-exits",
-                &target_machine,
-                inkwell::passes::PassBuilderOptions::create(),
-            )
-            .unwrap();
+        // self.module
+        //     .run_passes(
+        //         "tailcallelim,\
+        //         mem2reg,\
+        //         bdce,\
+        //         dce,\
+        //         dse,\
+        //         instcombine,\
+        //         consthoist,\
+        //         loop-deletion,\
+        //         loop-data-prefetch,\
+        //         loop-distribute,\
+        //         loop-flatten,\
+        //         loop-fusion,\
+        //         loop-load-elim,\
+        //         loop-reduce,\
+        //         loop-unroll,\
+        //         loop-rotate,\
+        //         loop-simplify,\
+        //         loop-sink,\
+        //         loop-vectorize,\
+        //         unify-loop-exits",
+        //         &target_machine,
+        //         inkwell::passes::PassBuilderOptions::create(),
+        //     )
+        //     .unwrap();
 
         self.print_ir();
 
@@ -710,27 +711,66 @@ impl<'ctx> IRGenerator<'ctx> {
                     )
                 };
 
-                match self.builder.build_unconditional_branch(merge_bb) {
-                    Ok(_) => {}
-                    Err(e) => {
-                        return Err(format!("something went wrong during `if` codegen. {}", e))
+                match self
+                    .builder
+                    .get_insert_block()
+                    .unwrap() // always exists
+                    .get_last_instruction()
+                {
+                    None => {}
+                    Some(ins) => {
+                        if ins.get_opcode() == InstructionOpcode::Return
+                            || ins.get_opcode() == InstructionOpcode::Br
+                        {
+                            println!("brr");
+                            // self.print_ir();
+                            // return Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
+                        } else {
+                            match self.builder.build_unconditional_branch(merge_bb) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    return Err(format!(
+                                        "something went wrong during `if` codegen. {}",
+                                        e
+                                    ))
+                                }
+                            };
+                        }
                     }
-                };
+                }
 
                 // Else block (if present)
                 let else_val = if let Some(else_bb) = else_bb {
                     self.builder.position_at_end(else_bb);
                     let else_expr = else_.clone().unwrap();
                     let (else_val, _) = self.gen_expression(&else_expr, function)?;
-                    match self.builder.build_unconditional_branch(merge_bb) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            return Err(format!(
-                                "something went wrong during `if-else` codegen. {}",
-                                e
-                            ))
+                    match self
+                        .builder
+                        .get_insert_block()
+                        .unwrap() // always exists
+                        .get_last_instruction()
+                    {
+                        None => {}
+                        Some(ins) => {
+                            if ins.get_opcode() == InstructionOpcode::Return
+                                || ins.get_opcode() == InstructionOpcode::Br
+                            {
+                                // println!("brr");
+                                // self.print_ir();
+                                // return Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
+                            } else {
+                                match self.builder.build_unconditional_branch(merge_bb) {
+                                    Ok(_) => {}
+                                    Err(e) => {
+                                        return Err(format!(
+                                            "something went wrong during `if` codegen. {}",
+                                            e
+                                        ))
+                                    }
+                                };
+                            }
                         }
-                    };
+                    }
                     else_val.as_basic_enum(self.context)
                 } else {
                     BasicValueEnum::IntValue(self.context.i32_type().const_zero())
@@ -1867,34 +1907,33 @@ impl<'ctx> IRGenerator<'ctx> {
 
                     let inner_ptr = unsafe {
                         self.builder
-                            .build_gep(
-                                llvm_element_type_enum,
-                                ptr,
-                                &[const_i],
-                                &format!("elem_{}", i)
-                            ).unwrap()
+                            .build_gep(array_type, ptr, &[const_0, const_i], &format!("elem_{}", i))
+                            .unwrap()
                     };
 
                     self.builder.build_store(inner_ptr, expr).unwrap();
                 }
 
-                Ok((IRValue::Simple(ptr.into()), IRType::Simple(llvm_element_type_enum)))
+                Ok((
+                    IRValue::Simple(ptr.into()),
+                    IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into()),
+                ))
 
                 // let global_array = self.module.add_global(array_type, Some(AddressSpace::Const), "array_global").unwrap();
                 // global_array.set_initializer(&array_value);
                 // Ok(global_array.as_pointer_value().as_basic_value_enum())
             }
             TypedExpr::While(cond, body, _type_) => {
-                match **body {
-                    TypedExpr::Break => {
-                        return Ok((
-                            IRValue::Simple(self.context.i32_type().const_zero().into()),
-                            IRType::Simple(self.context.i32_type().into())
-                        ))       
-                    }
-                    TypedExpr::Continue => return Err("created an infinite loop with no body".to_string()),
-                    _=>{}
-                }
+                // match **body {
+                //     TypedExpr::Break => {
+                //         return Ok((
+                //             IRValue::Simple(self.context.i32_type().const_zero().into()),
+                //             IRType::Simple(self.context.i32_type().into())
+                //         ))
+                //     }
+                //     TypedExpr::Continue => return Err("created an infinite loop with no body".to_string()),
+                //     _=>{}
+                // }
                 // Create basic blocks for the loop
                 let cond_bb = self.context.append_basic_block(function, "while_cond");
                 let body_bb = self.context.append_basic_block(function, "while_body");
@@ -1916,10 +1955,30 @@ impl<'ctx> IRGenerator<'ctx> {
 
                 // Loop body block
                 self.builder.position_at_end(body_bb);
-                let pre_loop_bbs = self.loop_bbs.clone();
+                let pre_loop_bbs = self.loop_bbs;
                 self.loop_bbs = Some((body_bb, after_bb));
                 self.gen_expression(body, function)?;
-                self.builder.build_unconditional_branch(cond_bb).unwrap(); // Loop back to the condition
+
+                match self
+                    .builder
+                    .get_insert_block()
+                    .unwrap() // always exists
+                    .get_last_instruction()
+                {
+                    None => {}
+                    Some(ins) => {
+                        if ins.get_opcode() == InstructionOpcode::Return
+                            || ins.get_opcode() == InstructionOpcode::Br
+                        {
+                            println!("brr");
+                            // self.print_ir();
+                            // return Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
+                        } else {
+                            self.builder.build_unconditional_branch(cond_bb).unwrap();
+                            // Loop back to the condition
+                        }
+                    }
+                }
 
                 // After loop block
                 self.builder.position_at_end(after_bb);
@@ -1973,19 +2032,26 @@ impl<'ctx> IRGenerator<'ctx> {
                     .as_basic_enum(self.context)
                     .into_int_value();
                 println!("3");
-                let index_type = self.context.i64_type();
                 println!("4");
                 let index_ptr = unsafe {
                     self.builder
                         .build_gep(
                             self.type_to_llvm(type_.clone()).as_basic_enum(self.context),
-                            array_ptr, 
-                            &[index_value], 
-                            "element_ptr"
-                        ).unwrap()
+                            array_ptr,
+                            &[index_value],
+                            "element_ptr",
+                        )
+                        .unwrap()
                 };
-                
-                todo!()
+                let field_val = self
+                    .builder
+                    .build_load(
+                        self.type_to_llvm(type_.clone()).as_basic_enum(self.context),
+                        index_ptr,
+                        "index_val",
+                    )
+                    .unwrap();
+                return Ok((IRValue::Simple(field_val), self.type_to_llvm(type_.clone())));
             }
             TypedExpr::StructAccess(structref, field, _ty) => {
                 let (structref, structty) = self.gen_expression(structref, function)?;
@@ -2015,6 +2081,22 @@ impl<'ctx> IRGenerator<'ctx> {
             }
             TypedExpr::Return(expr, _return_type) => {
                 let (val, ty) = self.gen_expression(expr, function)?;
+                match self
+                    .builder
+                    .get_insert_block()
+                    .unwrap() // always exists
+                    .get_last_instruction()
+                {
+                    None => {}
+                    Some(ins) => {
+                        if ins.get_opcode() == InstructionOpcode::Return {
+                            return Ok((
+                                IRValue::Returned(Box::new(val)),
+                                IRType::Returned(Box::new(ty)),
+                            ));
+                        }
+                    }
+                }
 
                 // Create a return instruction
                 self.builder
@@ -2026,24 +2108,36 @@ impl<'ctx> IRGenerator<'ctx> {
                     IRType::Returned(Box::new(ty)),
                 ))
             }
-            TypedExpr::Tuple(..)=>todo!(),
-            TypedExpr::Assign(lhs, expr, _type_)=>{
+            TypedExpr::Tuple(..) => todo!(),
+            TypedExpr::Assign(lhs, expr, _type_) => {
                 let (val, ty) = self.gen_expression(&expr.clone(), function)?;
 
                 match *lhs.clone() {
-                    TypedExpr::Variable(name, _)=>{
+                    TypedExpr::Variable(name, _) => {
                         // Get the variable's alloca
-                        let var_alloca = self.variables.get(&name.to_string()).unwrap().0.as_basic_enum(self.context).into_pointer_value();
+                        let var_alloca = self
+                            .variables
+                            .get(&name.to_string())
+                            .unwrap()
+                            .0
+                            .as_basic_enum(self.context)
+                            .into_pointer_value();
 
                         // Store the value into the alloca
-                        self.builder.build_store(var_alloca, val.as_basic_enum(self.context)).unwrap();
+                        self.builder
+                            .build_store(var_alloca, val.as_basic_enum(self.context))
+                            .unwrap();
                         Ok((val, ty))
                     }
-                    TypedExpr::StructAccess(structref, field, _)=>{
+                    TypedExpr::StructAccess(structref, field, _) => {
                         let (structref, structty) = self.gen_expression(&structref, function)?;
                         let (struct_type, fields) = match structty {
                             IRType::Struct(struct_type, fields) => (struct_type, fields),
-                            _ => return Err("AAAAAAAAA!!!!!!!!!! INVALID STRUCT ACCESSSS!!!!".to_string()),
+                            _ => {
+                                return Err(
+                                    "AAAAAAAAA!!!!!!!!!! INVALID STRUCT ACCESSSS!!!!".to_string()
+                                )
+                            }
                         };
                         for (i, (name, ty)) in fields.iter().enumerate() {
                             if *name == field {
@@ -2056,41 +2150,50 @@ impl<'ctx> IRGenerator<'ctx> {
                                         "field_ptr",
                                     )
                                     .unwrap();
-                                self.builder.build_store(
-                                    field_ptr,
-                                    val.as_basic_enum(self.context)
-                                ).unwrap();
+                                self.builder
+                                    .build_store(field_ptr, val.as_basic_enum(self.context))
+                                    .unwrap();
                                 let field_val = self
                                     .builder
-                                    .build_load(ty.as_basic_enum(self.context), field_ptr, "field_val")
+                                    .build_load(
+                                        ty.as_basic_enum(self.context),
+                                        field_ptr,
+                                        "field_val",
+                                    )
                                     .unwrap();
 
                                 return Ok((IRValue::Simple(field_val), ty.clone()));
                             }
                         }
-                        return Err(format!("no such field {field} in struct."))
+                        Err(format!("no such field {field} in struct."))
                     }
-                    _=>Err("tried to assign to invalid value".to_string())
+                    _ => Err("tried to assign to invalid value".to_string()),
                 }
-            },
+            }
             TypedExpr::Break => {
                 match self.loop_bbs {
                     Some((_, after_bb)) => {
                         self.builder.build_unconditional_branch(after_bb).unwrap();
-                    },
+                    }
                     None => return Err("Tried to use break outside of a loop.".to_string()),
                 }
-                Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
-            },
+                Ok((
+                    IRValue::Simple(self.context.i32_type().const_zero().into()),
+                    IRType::Simple(self.context.i32_type().into()),
+                ))
+            }
             TypedExpr::Continue => {
                 match self.loop_bbs {
                     Some((body_bb, _)) => {
                         self.builder.build_unconditional_branch(body_bb).unwrap();
-                    },
+                    }
                     None => return Err("Tried to use continue outside of a loop.".to_string()),
                 }
-                Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
-            },
+                Ok((
+                    IRValue::Simple(self.context.i32_type().const_zero().into()),
+                    IRType::Simple(self.context.i32_type().into()),
+                ))
+            }
         }
     }
 
@@ -2168,8 +2271,7 @@ fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
         TypedExpr::StructAccess(_, _, ty) => ty.clone(),
         TypedExpr::Return(_, ty) => ty.clone(),
         TypedExpr::Tuple(_, ty) => ty.clone(),
-        TypedExpr::Assign(_,_, ty)=>ty.clone(),
-        TypedExpr::Break 
-        | TypedExpr::Continue => t_int!()
+        TypedExpr::Assign(_, _, ty) => ty.clone(),
+        TypedExpr::Break | TypedExpr::Continue => t_int!(),
     }
 }

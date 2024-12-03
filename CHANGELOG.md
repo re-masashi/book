@@ -41,3 +41,7 @@ DD/MM/YYYY
 ## 4/12/2024
 	- Removed return, break and continue.
 	- Trying to rewrite the parser or work on array codegen. Terribly stuck.
+
+## 5/12/2024
+	- Re-added return, break and continue.
+	- Arrays added. Indexing works. n-Dimensional arrays work. (thanks a lot void*)

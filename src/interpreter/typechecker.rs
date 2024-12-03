@@ -297,10 +297,12 @@ impl<'a> TypeEnv {
                 let (index, _index_type) = self.expr_to_type(index, substitutions);
                 // println!("{:?}", expr);
                 let ty = match expr_type.as_ref() {
-                    Type::Constructor(c) if c.name == "Array" =>{
+                    Type::Constructor(c) if c.name == "Array" => {
                         c.generics[0].clone() // always works
                     }
-                    ref c=>{todo!("add custom indexing types. {:?}", c)}
+                    ref c => {
+                        todo!("add custom indexing types. {:?}", c)
+                    }
                 };
                 return (
                     TypedExpr::Index(Box::new(expr), Box::new(index), ty.clone()),
@@ -346,11 +348,13 @@ impl<'a> TypeEnv {
                 let (val, val_type) = self.expr_to_type(val, substitutions);
                 let (lhs, lhs_type) = self.expr_to_type(lhs, substitutions);
                 unify(val_type.clone(), lhs_type, substitutions);
-                return (TypedExpr::Assign(Box::new(lhs), Box::new(val), val_type.clone()), val_type);
+                return (
+                    TypedExpr::Assign(Box::new(lhs), Box::new(val), val_type.clone()),
+                    val_type,
+                );
             }
             Expr::Break => return (TypedExpr::Break, t_int!()),
             Expr::Continue => return (TypedExpr::Continue, t_int!()),
-
         };
         let substituted_expr = Self::substitute_type_vars_in_typed_expr(typed_expr, substitutions);
         let substituted_ty = Self::substitute_type_vars(ty, substitutions);
@@ -755,15 +759,15 @@ impl<'a> TypeEnv {
                 let new_ty = Self::substitute_type_vars(ty, substitutions);
                 TypedExpr::Tuple(new_vals, new_ty)
             }
-            TypedExpr::Assign(name, expr, ty) => {
-                TypedExpr::Assign(
-                    name,
-                    Box::new(Self::substitute_type_vars_in_typed_expr(*expr, substitutions)),
-                    Self::substitute_type_vars(ty, substitutions)
-                )
-            }
-            TypedExpr::Break
-            |TypedExpr::Continue => typed_expr,
+            TypedExpr::Assign(name, expr, ty) => TypedExpr::Assign(
+                name,
+                Box::new(Self::substitute_type_vars_in_typed_expr(
+                    *expr,
+                    substitutions,
+                )),
+                Self::substitute_type_vars(ty, substitutions),
+            ),
+            TypedExpr::Break | TypedExpr::Continue => typed_expr,
         }
     }
 
@@ -825,7 +829,6 @@ fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
         TypedExpr::Return(_, ty) => ty.clone(),
         TypedExpr::Tuple(_, ty) => ty.clone(),
         TypedExpr::Assign(_, _, ty) => ty.clone(),
-        TypedExpr::Break 
-        | TypedExpr::Continue => t_int!()
+        TypedExpr::Break | TypedExpr::Continue => t_int!(),
     }
 }

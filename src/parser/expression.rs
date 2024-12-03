@@ -71,9 +71,9 @@ impl<'a> Parser<'_> {
             TokenType::Minus => {
                 Expr::UnaryOp(UnaryOperator::Negate, Box::new(self.parse_expression()?))
             }
-            TokenType::Break => return Err("break is too unstable to be used...".to_string()), // return Ok(Expr::Break),
-            TokenType::Continue => return Err("continue is too unstable to be used...".to_string()), // return Ok(Expr::Continue),
-            TokenType::Return => return Err("return is too unstable to be used...".to_string()), // return Ok(Expr::Return(Box::new(self.parse_expression()?))),
+            TokenType::Break => return Ok(Expr::Break),
+            TokenType::Continue => return Ok(Expr::Continue),
+            TokenType::Return => return Ok(Expr::Return(Box::new(self.parse_expression()?))),
             TokenType::Not => Expr::UnaryOp(UnaryOperator::Not, Box::new(self.parse_expression()?)),
             ref x => return Err(format!("expected a valid expression. found `{}`.", x)),
         };
@@ -85,8 +85,8 @@ impl<'a> Parser<'_> {
             l_value = Expr::Index(Box::new(l_value), Box::new(index?));
             if let TokenType::RBrack = unwrap_some!(self.tokens.peek()).type_ {
                 self.advance(); // eat ']'
-            }else{
-                return Err("unclosed delimiter ']' after array index.".to_string())
+            } else {
+                return Err("unclosed delimiter ']' after array index.".to_string());
             }
         }
 
@@ -136,16 +136,11 @@ impl<'a> Parser<'_> {
 
         while let TokenType::Assign = unwrap_some!(self.tokens.peek()).type_ {
             match l_value {
-                Expr::Variable(..)
-                | Expr::StructAccess(..)
-                | Expr::Index(..) =>{
+                Expr::Variable(..) | Expr::StructAccess(..) | Expr::Index(..) => {
                     self.advance(); // eat '='
-                    l_value = Expr::Assign(
-                        Box::new(l_value),
-                        Box::new(self.parse_expression()?),
-                    );
+                    l_value = Expr::Assign(Box::new(l_value), Box::new(self.parse_expression()?));
                 }
-                _=>return Err("invalid expression on LHS of assignment.".to_string())
+                _ => return Err("invalid expression on LHS of assignment.".to_string()),
             }
         }
 

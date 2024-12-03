@@ -16,8 +16,11 @@ end
 
 def count_to_1M_while() -> bool do
 	let n = 0
-	while n < 1_000_000 then
-		n = n+1 # i still dont have a syntax for n = n+1
+	while n < 2_0 then do
+		n = n+1
+		if n==3 then
+			break
+	end
 end
 
 def handler(req: str) -> Response do
@@ -37,4 +40,4 @@ end
 
 println(type("abcd"))
 println(type(11))
-
+count_to_1M_while()

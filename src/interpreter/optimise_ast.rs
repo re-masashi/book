@@ -32,7 +32,7 @@ pub fn optimise_constant_fold(ast: &mut TypedExpr) {
         TypedExpr::Assign(_name, expr, _) => {
             optimise_constant_fold(expr);
             // todo: handle this w care
-        },
+        }
         TypedExpr::Lambda(_, expr, _) => optimise_constant_fold(expr),
         TypedExpr::Literal(_, _) => {} // skip
         TypedExpr::If(cond, if_, else_, _) => {
@@ -180,8 +180,7 @@ pub fn optimise_constant_fold(ast: &mut TypedExpr) {
                 optimise_constant_fold(element);
             }
         }
-        TypedExpr::Break 
-        | TypedExpr::Continue => {}
+        TypedExpr::Break | TypedExpr::Continue => {}
     };
     if to_swap {
         // println!("swapped");
@@ -215,7 +214,7 @@ pub fn optimise_constant_propagation<'a>(
         }
         TypedExpr::Assign(_name, expr, _) => {
             optimise_constant_propagation(expr, variables);
-        },
+        }
         TypedExpr::Lambda(_args, expr, _) => optimise_constant_propagation(expr, variables),
         TypedExpr::Literal(_, _) => {} // skip
         TypedExpr::If(cond, if_, else_, _) => {
@@ -263,8 +262,7 @@ pub fn optimise_constant_propagation<'a>(
                 optimise_constant_propagation(element, variables);
             }
         }
-        TypedExpr::Break 
-        | TypedExpr::Continue => {}
+        TypedExpr::Break | TypedExpr::Continue => {}
     }
     if to_swap {
         *ast = temp
@@ -307,7 +305,7 @@ pub fn optimise_const_branching_if(ast: &mut TypedExpr) {
         }
         TypedExpr::Assign(_name, expr, _) => {
             optimise_const_branching_if(expr);
-        },
+        }
         TypedExpr::Lambda(_, expr, _) => optimise_const_branching_if(expr),
         TypedExpr::Literal(_, _) => {} // skip
         TypedExpr::Call(func, args, _) => {
@@ -348,8 +346,7 @@ pub fn optimise_const_branching_if(ast: &mut TypedExpr) {
                 optimise_const_branching_if(element);
             }
         }
-        TypedExpr::Break 
-        | TypedExpr::Continue => {}
+        TypedExpr::Break | TypedExpr::Continue => {}
     };
     if to_swap {
         // println!("swapped if-else");
