@@ -332,6 +332,15 @@ impl<'a> TypeEnv {
                     return (TypedExpr::Tuple(typed_vals, val_type.clone()), val_type);
                 }
             }
+            Expr::Assign(lhs, val) => {
+                let (val, val_type) = self.expr_to_type(val, substitutions);
+                let (lhs, lhs_type) = self.expr_to_type(lhs, substitutions);
+                unify(val_type.clone(), lhs_type, substitutions);
+                return (TypedExpr::Assign(Box::new(lhs), Box::new(val), val_type.clone()), val_type);
+            }
+            Expr::Break => return (TypedExpr::Break, t_int!()),
+            Expr::Continue => return (TypedExpr::Continue, t_int!()),
+
         };
         let substituted_expr = Self::substitute_type_vars_in_typed_expr(typed_expr, substitutions);
         let substituted_ty = Self::substitute_type_vars(ty, substitutions);
@@ -736,6 +745,15 @@ impl<'a> TypeEnv {
                 let new_ty = Self::substitute_type_vars(ty, substitutions);
                 TypedExpr::Tuple(new_vals, new_ty)
             }
+            TypedExpr::Assign(name, expr, ty) => {
+                TypedExpr::Assign(
+                    name,
+                    Box::new(Self::substitute_type_vars_in_typed_expr(*expr, substitutions)),
+                    Self::substitute_type_vars(ty, substitutions)
+                )
+            }
+            TypedExpr::Break
+            |TypedExpr::Continue => typed_expr,
         }
     }
 
@@ -796,5 +814,8 @@ fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
         TypedExpr::StructAccess(_, _, ty) => ty.clone(),
         TypedExpr::Return(_, ty) => ty.clone(),
         TypedExpr::Tuple(_, ty) => ty.clone(),
+        TypedExpr::Assign(_, _, ty) => ty.clone(),
+        TypedExpr::Break 
+        | TypedExpr::Continue => t_int!()
     }
 }

@@ -11,6 +11,8 @@ pub enum TokenType {
     If,
     Else,
     While,
+    Break,
+    Continue,
     In,
     As,
     Def,
@@ -93,6 +95,8 @@ impl std::fmt::Display for TokenType {
                 TokenType::Struct => "struct".to_string(),
                 TokenType::Enum => "enum".to_string(),
                 TokenType::Return => "return".to_string(),
+                TokenType::Break => "break".to_string(),
+                TokenType::Continue => "continue".to_string(),
                 TokenType::True => "true".to_string(),
                 TokenType::False => "false".to_string(),
 

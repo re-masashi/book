@@ -71,7 +71,9 @@ impl<'a> Parser<'_> {
             TokenType::Minus => {
                 Expr::UnaryOp(UnaryOperator::Negate, Box::new(self.parse_expression()?))
             }
-            TokenType::Return => return Ok(Expr::Return(Box::new(self.parse_expression()?))),
+            TokenType::Break => return Err("break is too unstable to be used...".to_string()), // return Ok(Expr::Break),
+            TokenType::Continue => return Err("continue is too unstable to be used...".to_string()), // return Ok(Expr::Continue),
+            TokenType::Return => return Err("return is too unstable to be used...".to_string()), // return Ok(Expr::Return(Box::new(self.parse_expression()?))),
             TokenType::Not => Expr::UnaryOp(UnaryOperator::Not, Box::new(self.parse_expression()?)),
             ref x => return Err(format!("expected a valid expression. found `{}`.", x)),
         };
@@ -131,7 +133,18 @@ impl<'a> Parser<'_> {
         }
 
         while let TokenType::Assign = unwrap_some!(self.tokens.peek()).type_ {
-            todo!()
+            match l_value {
+                Expr::Variable(..)
+                | Expr::StructAccess(..)
+                | Expr::Index(..) =>{
+                    self.advance(); // eat '='
+                    l_value = Expr::Assign(
+                        Box::new(l_value),
+                        Box::new(self.parse_expression()?),
+                    );
+                }
+                _=>return Err("invalid expression on LHS of assignment.".to_string())
+            }
         }
 
         while let TokenType::Plus

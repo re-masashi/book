@@ -8,6 +8,7 @@ use inkwell::types::{BasicMetadataTypeEnum, BasicType, BasicTypeEnum, StructType
 use inkwell::values::{
     BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, StructValue,
 };
+use inkwell::basic_block::BasicBlock;
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
 use inkwell::{FloatPredicate, IntPredicate};
@@ -35,6 +36,7 @@ pub struct IRGenerator<'ctx> {
     file: String,
     polymorphic_functions: HashMap<String, Vec<PolyMorphicFunction<'ctx>>>,
     builtins: Vec<IRValue<'ctx>>,
+    loop_bbs: Option<(BasicBlock<'ctx>,BasicBlock<'ctx>,)>,
 }
 
 pub struct PolyMorphicFunction<'ctx>(
@@ -140,6 +142,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 IRValue::BuiltIn("type".to_string()),
                 IRValue::BuiltIn("print".to_string()),
             ],
+            loop_bbs: None,
         }
     }
 
@@ -159,7 +162,7 @@ impl<'ctx> IRGenerator<'ctx> {
         let free_type = self
             .context
             .void_type()
-            .fn_type(&[self.context.i8_type().into()], false);
+            .fn_type(&[self.context.i8_type().into()], false); // maybe not needed?
         let _free_func = self.module.add_function("GC_free", free_type, None);
     }
 
@@ -1876,6 +1879,16 @@ impl<'ctx> IRGenerator<'ctx> {
                 // Ok(global_array.as_pointer_value().as_basic_value_enum())
             }
             TypedExpr::While(cond, body, _type_) => {
+                match **body {
+                    TypedExpr::Break => {
+                        return Ok((
+                            IRValue::Simple(self.context.i32_type().const_zero().into()),
+                            IRType::Simple(self.context.i32_type().into())
+                        ))       
+                    }
+                    TypedExpr::Continue => return Err("created an infinite loop with no body".to_string()),
+                    _=>{}
+                }
                 // Create basic blocks for the loop
                 let cond_bb = self.context.append_basic_block(function, "while_cond");
                 let body_bb = self.context.append_basic_block(function, "while_body");
@@ -1897,11 +1910,14 @@ impl<'ctx> IRGenerator<'ctx> {
 
                 // Loop body block
                 self.builder.position_at_end(body_bb);
+                let pre_loop_bbs = self.loop_bbs.clone();
+                self.loop_bbs = Some((body_bb, after_bb));
                 self.gen_expression(body, function)?;
                 self.builder.build_unconditional_branch(cond_bb).unwrap(); // Loop back to the condition
 
                 // After loop block
                 self.builder.position_at_end(after_bb);
+                self.loop_bbs = pre_loop_bbs;
 
                 Ok((
                     IRValue::Simple(self.context.i32_type().const_zero().into()),
@@ -2017,6 +2033,70 @@ impl<'ctx> IRGenerator<'ctx> {
                 ))
             }
             TypedExpr::Tuple(..)=>todo!(),
+            TypedExpr::Assign(lhs, expr, _type_)=>{
+                let (val, ty) = self.gen_expression(&expr.clone(), function)?;
+
+                match *lhs.clone() {
+                    TypedExpr::Variable(name, _)=>{
+                        // Get the variable's alloca
+                        let var_alloca = self.variables.get(&name.to_string()).unwrap().0.as_basic_enum(self.context).into_pointer_value();
+
+                        // Store the value into the alloca
+                        self.builder.build_store(var_alloca, val.as_basic_enum(self.context)).unwrap();
+                        Ok((val, ty))
+                    }
+                    TypedExpr::StructAccess(structref, field, _)=>{
+                        let (structref, structty) = self.gen_expression(&structref, function)?;
+                        let (struct_type, fields) = match structty {
+                            IRType::Struct(struct_type, fields) => (struct_type, fields),
+                            _ => return Err("AAAAAAAAA!!!!!!!!!! INVALID STRUCT ACCESSSS!!!!".to_string()),
+                        };
+                        for (i, (name, ty)) in fields.iter().enumerate() {
+                            if *name == field {
+                                let field_ptr = self
+                                    .builder
+                                    .build_struct_gep(
+                                        struct_type,
+                                        structref.as_basic_enum(self.context).into_pointer_value(),
+                                        i as u32,
+                                        "field_ptr",
+                                    )
+                                    .unwrap();
+                                self.builder.build_store(
+                                    field_ptr,
+                                    val.as_basic_enum(self.context)
+                                ).unwrap();
+                                let field_val = self
+                                    .builder
+                                    .build_load(ty.as_basic_enum(self.context), field_ptr, "field_val")
+                                    .unwrap();
+
+                                return Ok((IRValue::Simple(field_val), ty.clone()));
+                            }
+                        }
+                        return Err(format!("no such field {field} in struct."))
+                    }
+                    _=>Err("tried to assign to invalid value".to_string())
+                }
+            },
+            TypedExpr::Break => {
+                match self.loop_bbs {
+                    Some((_, after_bb)) => {
+                        self.builder.build_unconditional_branch(after_bb).unwrap();
+                    },
+                    None => return Err("Tried to use break outside of a loop.".to_string()),
+                }
+                Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
+            },
+            TypedExpr::Continue => {
+                match self.loop_bbs {
+                    Some((body_bb, _)) => {
+                        self.builder.build_unconditional_branch(body_bb).unwrap();
+                    },
+                    None => return Err("Tried to use continue outside of a loop.".to_string()),
+                }
+                Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
+            },
         }
     }
 
@@ -2093,5 +2173,8 @@ fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
         TypedExpr::StructAccess(_, _, ty) => ty.clone(),
         TypedExpr::Return(_, ty) => ty.clone(),
         TypedExpr::Tuple(_, ty) => ty.clone(),
+        TypedExpr::Assign(_,_, ty)=>ty.clone(),
+        TypedExpr::Break 
+        | TypedExpr::Continue => t_int!()
     }
 }

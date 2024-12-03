@@ -130,6 +130,8 @@ pub enum TypedExpr<'a> {
     ), // condition, if_branch, else_branch
     Call(Box<TypedExpr<'a>>, Vec<Box<TypedExpr<'a>>>, Arc<Type>), // value to call, arguments
     While(Box<TypedExpr<'a>>, Box<TypedExpr<'a>>, Arc<Type>), // condition, body
+    Break,
+    Continue,
     BinaryOp(
         Box<TypedExpr<'a>>,
         &'a BinaryOperator,
@@ -143,6 +145,7 @@ pub enum TypedExpr<'a> {
     StructAccess(Box<TypedExpr<'a>>, Cow<'a, str>, Arc<Type>),
     Return(Box<TypedExpr<'a>>, Arc<Type>),
     Tuple(Vec<TypedExpr<'a>>, Arc<Type>),
+    Assign(Box<TypedExpr<'a>>, Box<TypedExpr<'a>>, Arc<Type>), // variable name, expression, type
 }
 
 pub struct TypeEnv(pub HashMap<String, Arc<Type>>);
@@ -176,6 +179,8 @@ pub enum Expr<'a> {
     If(Box<Expr<'a>>, Box<Expr<'a>>, Option<Box<Expr<'a>>>), // condition, if_branch, else_branch
     Call(Box<Expr<'a>>, Vec<Box<Expr<'a>>>),             // value to call, arguments
     While(Box<Expr<'a>>, Box<Expr<'a>>),                 // condition, body
+    Break,
+    Continue,
     BinaryOp(Box<Expr<'a>>, BinaryOperator, Box<Expr<'a>>), // lhs, op, rhs
     UnaryOp(UnaryOperator, Box<Expr<'a>>),               // op, val
     Array(Vec<Expr<'a>>),
@@ -184,6 +189,7 @@ pub enum Expr<'a> {
     StructAccess(Box<Expr<'a>>, Cow<'a, str>),
     Return(Box<Expr<'a>>),
     Tuple(Vec<Expr<'a>>),
+    Assign(Box<Expr<'a>>, Box<Expr<'a>>), // variable name, expression
 }
 
 #[derive(Debug)]
