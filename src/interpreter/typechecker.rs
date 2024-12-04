@@ -174,7 +174,7 @@ impl<'a> TypeEnv {
                         )
                     }
                     Type::Constructor(..) => {
-                        panic!("invalid function");
+                        panic!("invalid function {:?}", value_);
                     }
                     Type::Struct(..) => {
                         todo!()
@@ -356,9 +356,9 @@ impl<'a> TypeEnv {
             Expr::Break => return (TypedExpr::Break, t_int!()),
             Expr::Continue => return (TypedExpr::Continue, t_int!()),
         };
-        let substituted_expr = Self::substitute_type_vars_in_typed_expr(typed_expr, substitutions);
-        let substituted_ty = Self::substitute_type_vars(ty, substitutions);
-        (substituted_expr, substituted_ty)
+        // let substituted_expr = self.substitute_type_vars_in_typed_expr(typed_expr, substitutions);
+        // let substituted_ty = self.substitute_type_vars(ty, substitutions);
+        (typed_expr, ty)
     }
 
     pub fn node_to_type(
@@ -382,6 +382,43 @@ impl<'a> TypeEnv {
             Node::Function(name, args, ret, ty) => match ty {
                 Some(ty) => {
                     trace!("{:?}", ty);
+                    let mut is_poly = false;
+                    for (_, argtype) in args {
+                        match argtype {
+                            Some(_) => {},
+                            None => {
+                                is_poly=true;
+                                break
+                            },
+                        }
+                    }
+                    if is_poly {
+                        let type_ = Type::Function(
+                            args.iter()
+                                .map(|(arg, argtype)| {
+                                    let type_: Arc<Type> = tvar!(self.0.len() + 1);
+                                    self.0.insert(arg.to_string(), type_.clone());
+                                    type_
+                                })
+                                .collect(),
+                            tvar!(self.0.len()+1),
+                        );
+                        self.0.insert(name.to_string(), type_.clone().into());
+                        let (ret, ret_type) = self.expr_to_type(ret, substitutions);
+                        unify(tvar!(self.0.len()+1), ret_type, substitutions);
+                        let retval = TypedNode::Function(
+                            std::borrow::Cow::Borrowed(name),
+                            args.iter()
+                                .map(|(arg, argtype)| {
+                                    let type_: Arc<Type> = tvar!(self.0.len() + 1);
+                                    self.0.insert(arg.to_string(), type_.clone());
+                                    (arg.clone(), type_)
+                                })
+                                .collect(),
+                            Box::new(ret),
+                            type_.clone().into(),
+                        );
+                    }
                     let annoted_type = Type::Constructor(TypeConstructor {
                         name: ty.name.to_string(),
                         generics: ty
@@ -565,19 +602,20 @@ impl<'a> TypeEnv {
                 TypedNode::Extern(name.clone(), typed_args, annoted_type.clone())
             }
         };
-        let x = Self::substitute_type_vars_in_typed_node(typed_node, substitutions);
+        let x = self.substitute_type_vars_in_typed_node(typed_node, substitutions);
         // println!("{:#?}", x);
         x
     }
 
     fn substitute_type_vars(
+        &mut self,
         ty: Arc<Type>,
-        substitutions: &HashMap<TypeVariable, Arc<Type>>,
+        substitutions: &mut HashMap<TypeVariable, Arc<Type>>,
     ) -> Arc<Type> {
         match ty.as_ref() {
             Type::Variable(tv) => {
                 if let Some(subst) = substitutions.get(tv) {
-                    Self::substitute_type_vars(subst.clone(), substitutions) // Recursively substitute
+                    self.substitute_type_vars(subst.clone(), substitutions) // Recursively substitute
                 } else {
                     ty.clone() // No substitution found
                 }
@@ -586,16 +624,16 @@ impl<'a> TypeEnv {
                 // let new_generics = generics.iter().map(|g| substitute_type_vars(g.clone(), substitutions)).collect::<Vec<_>>();
                 let new_args = args
                     .iter()
-                    .map(|arg| Self::substitute_type_vars(arg.clone(), substitutions))
+                    .map(|arg| self.substitute_type_vars(arg.clone(), substitutions))
                     .collect::<Vec<_>>();
-                let new_ret = Self::substitute_type_vars(ret.clone(), substitutions);
+                let new_ret = self.substitute_type_vars(ret.clone(), substitutions);
                 Type::Function(new_args, new_ret).into()
             }
             Type::Constructor(tc) => {
                 let new_generics = tc
                     .generics
                     .iter()
-                    .map(|g| Self::substitute_type_vars(g.clone(), substitutions))
+                    .map(|g| self.substitute_type_vars(g.clone(), substitutions))
                     .collect::<Vec<_>>();
                 Type::Constructor(TypeConstructor {
                     name: tc.name.clone(),
@@ -609,199 +647,212 @@ impl<'a> TypeEnv {
             Type::Tuple(vals) => {
                 let mut newvals = vec![];
                 for val in vals {
-                    newvals.push(Self::substitute_type_vars(val.clone(), substitutions))
+                    newvals.push(self.substitute_type_vars(val.clone(), substitutions))
                 }
                 Type::Tuple(newvals).into()
             }
         }
     }
 
-    fn substitute_type_vars_in_typed_expr(
+    pub fn substitute_type_vars_in_typed_expr(
+        &mut self,
         typed_expr: TypedExpr<'a>,
-        substitutions: &HashMap<TypeVariable, Arc<Type>>,
+        substitutions: &mut HashMap<TypeVariable, Arc<Type>>,
     ) -> TypedExpr<'a> {
         match typed_expr {
             TypedExpr::Literal(lit, ty) => {
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
                 TypedExpr::Literal(lit, new_ty)
             }
             TypedExpr::Variable(name, ty) => {
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
-                TypedExpr::Variable(name, new_ty)
+                match self.0.get(&name.to_string()) {
+                    Some(t) => {
+                        unify(ty, t.clone(), substitutions);
+                        TypedExpr::Variable(std::borrow::Cow::Owned(name.to_string()), self.substitute_type_vars(t.clone(), substitutions))
+                    }
+                    None => {
+                        // println!("unknown type {name}");
+                        self.0
+                            .insert(name.to_string(), tvar!(self.0.len() + 1).clone());
+                        
+                        TypedExpr::Variable(std::borrow::Cow::Owned(name.to_string()), tvar!(self.0.len()))
+                        
+                    }
+                }
             }
             TypedExpr::Lambda(args, body, ret_ty) => {
                 let new_args = args
                     .into_iter()
-                    .map(|(name, ty)| (name, Self::substitute_type_vars(ty, substitutions)))
+                    .map(|(name, ty)| (name, self.substitute_type_vars(ty, substitutions)))
                     .collect();
-                let new_body = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_body = Box::new(self.substitute_type_vars_in_typed_expr(
                     *body,
                     substitutions,
                 ));
-                let new_ret_ty = Self::substitute_type_vars(ret_ty, substitutions);
+                let new_ret_ty = self.substitute_type_vars(ret_ty, substitutions);
                 TypedExpr::Lambda(new_args, new_body, new_ret_ty)
             }
             TypedExpr::Let(name, expr, ty) => {
-                let new_expr = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_expr = Box::new(self.substitute_type_vars_in_typed_expr(
                     *expr,
                     substitutions,
                 ));
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
                 TypedExpr::Let(name, new_expr, new_ty)
             }
             TypedExpr::If(cond, then_branch, else_branch, ty) => {
-                let new_cond = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_cond = Box::new(self.substitute_type_vars_in_typed_expr(
                     *cond,
                     substitutions,
                 ));
-                let new_then_branch = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_then_branch = Box::new(self.substitute_type_vars_in_typed_expr(
                     *then_branch,
                     substitutions,
                 ));
                 let new_else_branch = else_branch.map(|eb| {
-                    Box::new(Self::substitute_type_vars_in_typed_expr(*eb, substitutions))
+                    Box::new(self.substitute_type_vars_in_typed_expr(*eb, substitutions))
                 });
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
 
                 TypedExpr::If(new_cond, new_then_branch, new_else_branch, new_ty)
             }
             TypedExpr::Call(func, args, ret_ty) => {
-                let new_func = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_func = Box::new(self.substitute_type_vars_in_typed_expr(
                     *func,
                     substitutions,
                 ));
                 let new_args = args
                     .into_iter()
                     .map(|arg| {
-                        Box::new(Self::substitute_type_vars_in_typed_expr(
+                        Box::new(self.substitute_type_vars_in_typed_expr(
                             *arg,
                             substitutions,
                         ))
                     })
                     .collect();
-                let new_ret_ty = Self::substitute_type_vars(ret_ty, substitutions);
+                let new_ret_ty = self.substitute_type_vars(ret_ty, substitutions);
                 TypedExpr::Call(new_func, new_args, new_ret_ty)
             }
             TypedExpr::While(cond, body, ty) => {
-                let new_cond = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_cond = Box::new(self.substitute_type_vars_in_typed_expr(
                     *cond,
                     substitutions,
                 ));
-                let new_body = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_body = Box::new(self.substitute_type_vars_in_typed_expr(
                     *body,
                     substitutions,
                 ));
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
                 TypedExpr::While(new_cond, new_body, new_ty)
             }
             TypedExpr::BinaryOp(lhs, op, rhs, ty) => {
-                let new_lhs = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_lhs = Box::new(self.substitute_type_vars_in_typed_expr(
                     *lhs,
                     substitutions,
                 ));
-                let new_rhs = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_rhs = Box::new(self.substitute_type_vars_in_typed_expr(
                     *rhs,
                     substitutions,
                 ));
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
                 TypedExpr::BinaryOp(new_lhs, op, new_rhs, new_ty)
             }
             TypedExpr::UnaryOp(op, expr, ty) => {
-                let new_expr = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_expr = Box::new(self.substitute_type_vars_in_typed_expr(
                     *expr,
                     substitutions,
                 ));
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
                 TypedExpr::UnaryOp(op, new_expr, new_ty)
             }
             TypedExpr::Array(values, ty) => {
                 let new_vals = values
                     .into_iter()
-                    .map(|val| Self::substitute_type_vars_in_typed_expr(val, substitutions))
+                    .map(|val| self.substitute_type_vars_in_typed_expr(val, substitutions))
                     .collect();
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
                 TypedExpr::Array(new_vals, new_ty)
             }
             TypedExpr::Do(exprs, ty) => {
                 let new_exprs = exprs
                     .into_iter()
-                    .map(|expr| Self::substitute_type_vars_in_typed_expr(expr, substitutions))
+                    .map(|expr| self.substitute_type_vars_in_typed_expr(expr, substitutions))
                     .collect();
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
                 TypedExpr::Do(new_exprs, new_ty)
             }
             TypedExpr::Index(arr, index, ty) => {
-                let new_arr = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_arr = Box::new(self.substitute_type_vars_in_typed_expr(
                     *arr,
                     substitutions,
                 ));
-                let new_idx = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_idx = Box::new(self.substitute_type_vars_in_typed_expr(
                     *index,
                     substitutions,
                 ));
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
 
                 TypedExpr::Index(new_arr, new_idx, new_ty)
             }
             TypedExpr::StructAccess(_, _, _) => typed_expr,
             TypedExpr::Return(expr, ty) => TypedExpr::Return(
-                Box::new(Self::substitute_type_vars_in_typed_expr(
+                Box::new(self.substitute_type_vars_in_typed_expr(
                     *expr,
                     substitutions,
                 )),
-                Self::substitute_type_vars(ty, substitutions),
+                self.substitute_type_vars(ty, substitutions),
             ),
             TypedExpr::Tuple(values, ty) => {
                 let new_vals = values
                     .into_iter()
-                    .map(|val| Self::substitute_type_vars_in_typed_expr(val, substitutions))
+                    .map(|val| self.substitute_type_vars_in_typed_expr(val, substitutions))
                     .collect();
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
                 TypedExpr::Tuple(new_vals, new_ty)
             }
             TypedExpr::Assign(name, expr, ty) => TypedExpr::Assign(
                 name,
-                Box::new(Self::substitute_type_vars_in_typed_expr(
+                Box::new(self.substitute_type_vars_in_typed_expr(
                     *expr,
                     substitutions,
                 )),
-                Self::substitute_type_vars(ty, substitutions),
+                self.substitute_type_vars(ty, substitutions),
             ),
             TypedExpr::Break | TypedExpr::Continue => typed_expr,
         }
     }
 
-    //And similarly for TypedNode:
     pub fn substitute_type_vars_in_typed_node(
+        &mut self,
         typed_node: TypedNode<'a>,
-        substitutions: &HashMap<TypeVariable, Arc<Type>>,
+        substitutions: &mut HashMap<TypeVariable, Arc<Type>>,
     ) -> TypedNode<'a> {
         match typed_node {
             TypedNode::Expr(expr, ty) => {
-                let new_expr = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_expr = Box::new(self.substitute_type_vars_in_typed_expr(
                     *expr,
                     substitutions,
                 ));
-                let new_ty = Self::substitute_type_vars(ty, substitutions);
+                let new_ty = self.substitute_type_vars(ty, substitutions);
                 TypedNode::Expr(new_expr, new_ty)
             }
             TypedNode::Function(name, args, body, ret_ty) => {
                 let new_args = args
                     .into_iter()
-                    .map(|(name, ty)| (name, Self::substitute_type_vars(ty, substitutions)))
+                    .map(|(name, ty)| (name, self.substitute_type_vars(ty, substitutions)))
                     .collect();
-                let new_body = Box::new(Self::substitute_type_vars_in_typed_expr(
+                let new_body = Box::new(self.substitute_type_vars_in_typed_expr(
                     *body,
                     substitutions,
                 ));
-                let new_ret_ty = Self::substitute_type_vars(ret_ty, substitutions);
+                let new_ret_ty = self.substitute_type_vars(ret_ty, substitutions);
 
                 TypedNode::Function(name, new_args, new_body, new_ret_ty)
             }
             TypedNode::Program(nodes) => {
                 let new_nodes = nodes
                     .into_iter()
-                    .map(|n| Self::substitute_type_vars_in_typed_node(n, substitutions))
+                    .map(|n| self.substitute_type_vars_in_typed_node(n, substitutions))
                     .collect();
                 TypedNode::Program(new_nodes)
             }

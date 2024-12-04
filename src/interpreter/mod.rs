@@ -303,9 +303,9 @@ impl TypeVariable {
 
                 false
             }
-            // Type::Function(_, _) => todo!(),
+            Type::Function(_, _) => false,
             // Type::Struct(_, _, _) => todo!(),
-            _ => todo!(),
+            x => todo!("{:?}", x),
         }
     }
 }

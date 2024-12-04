@@ -1,5 +1,11 @@
-def identity(i)
+def identity(i) do
+	let ty = type(i)
+	if strcmp(ty, "int")==0 then do
+		print("found an int ")
+		println(i)
+	end
 	i
+end
 
 identity(1)
-identity(1.2)
+identity("hello!")

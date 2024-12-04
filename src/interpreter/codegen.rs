@@ -722,7 +722,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         if ins.get_opcode() == InstructionOpcode::Return
                             || ins.get_opcode() == InstructionOpcode::Br
                         {
-                            println!("brr");
+                            // println!("brr");
                             // self.print_ir();
                             // return Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
                         } else {
@@ -1721,9 +1721,11 @@ impl<'ctx> IRGenerator<'ctx> {
                         }
                     }
                     (IRValue::PolyMorph(name, expr, polyargs, _ret), IRType::PolyMorph) => {
-                        let mut poly_args = vec![];
+                        let mut new_typed_args = vec![];
                         let arg_exprs = args;
                         let continuation_bb = function.get_last_basic_block().unwrap();
+
+                        let mut typeenv = TypeEnv(HashMap::new());
 
                         if args.len() != polyargs.len() {
                             return Err("Invalid number of args".to_string());
@@ -1735,25 +1737,26 @@ impl<'ctx> IRGenerator<'ctx> {
                             if let Type::Variable(v) = polyargs[i].1.as_ref() {
                                 substitutions.insert(*v, ty.clone());
                             }
-                            poly_args.push((polyargs[i].0.clone().into(), ty));
+                            new_typed_args.push((polyargs[i].0.clone().into(), ty));
                         }
 
                         let new_name = format!("{name}${}$", self.lambda_counter);
                         self.lambda_counter += 1;
 
                         let TypedNode::Function(_, args, expr, ret) =
-                            TypeEnv::substitute_type_vars_in_typed_node(
+                            typeenv.substitute_type_vars_in_typed_node(
                                 TypedNode::Function(
                                     new_name.clone().into(),
-                                    poly_args,
+                                    new_typed_args,
                                     expr,
                                     type_.clone(),
                                 ),
-                                &substitutions,
+                                &mut substitutions,
                             )
                         else {
                             unreachable!()
                         };
+                        println!("{:?}", substitutions);
 
                         let (IRValue::Function(function_to_call, _, _), _fn_type) = self
                             .gen_function(
@@ -1761,7 +1764,10 @@ impl<'ctx> IRGenerator<'ctx> {
                                 args.iter()
                                     .map(|(x, t)| (x.to_string(), t.clone()))
                                     .collect(),
-                                &expr,
+                                &typeenv.substitute_type_vars_in_typed_expr(
+                                    *expr,
+                                    &mut substitutions,
+                                ),
                                 Type::Function(
                                     args.iter().map(|(_, t)| (t.clone())).collect(),
                                     ret.clone(),
@@ -1970,7 +1976,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         if ins.get_opcode() == InstructionOpcode::Return
                             || ins.get_opcode() == InstructionOpcode::Br
                         {
-                            println!("brr");
+                            // println!("brr");
                             // self.print_ir();
                             // return Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
                         } else {
@@ -2019,20 +2025,20 @@ impl<'ctx> IRGenerator<'ctx> {
                 }
             }
             TypedExpr::Index(array_expr, index_expr, type_) => {
-                println!("1");
+                // println!("1");
                 let array_ptr = self
                     .gen_expression(array_expr, function)?
                     .0
                     .as_basic_enum(self.context)
                     .into_pointer_value();
-                println!("2");
+                // println!("2");
                 let index_value = self
                     .gen_expression(index_expr, function)?
                     .0
                     .as_basic_enum(self.context)
                     .into_int_value();
-                println!("3");
-                println!("4");
+                // println!("3");
+                // println!("4");
                 let index_ptr = unsafe {
                     self.builder
                         .build_gep(
@@ -2051,7 +2057,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         "index_val",
                     )
                     .unwrap();
-                return Ok((IRValue::Simple(field_val), self.type_to_llvm(type_.clone())));
+                Ok((IRValue::Simple(field_val), self.type_to_llvm(type_.clone())))
             }
             TypedExpr::StructAccess(structref, field, _ty) => {
                 let (structref, structty) = self.gen_expression(structref, function)?;
@@ -2128,6 +2134,44 @@ impl<'ctx> IRGenerator<'ctx> {
                             .build_store(var_alloca, val.as_basic_enum(self.context))
                             .unwrap();
                         Ok((val, ty))
+                    }
+                    TypedExpr::Index(array_expr, index_expr, type_) => {
+                        // println!("1");
+                        let array_ptr = self
+                            .gen_expression(&array_expr, function)?
+                            .0
+                            .as_basic_enum(self.context)
+                            .into_pointer_value();
+                        // println!("2");
+                        let index_value = self
+                            .gen_expression(&index_expr, function)?
+                            .0
+                            .as_basic_enum(self.context)
+                            .into_int_value();
+                        // println!("3");
+                        // println!("4");
+                        let index_ptr = unsafe {
+                            self.builder
+                                .build_gep(
+                                    self.type_to_llvm(type_.clone()).as_basic_enum(self.context),
+                                    array_ptr,
+                                    &[index_value],
+                                    "element_ptr",
+                                )
+                                .unwrap()
+                        };
+                        self.builder
+                            .build_store(index_ptr, val.as_basic_enum(self.context))
+                            .unwrap();
+                        let field_val = self
+                            .builder
+                            .build_load(
+                                self.type_to_llvm(type_.clone()).as_basic_enum(self.context),
+                                index_ptr,
+                                "index_val",
+                            )
+                            .unwrap();
+                        Ok((IRValue::Simple(field_val), self.type_to_llvm(type_.clone())))
                     }
                     TypedExpr::StructAccess(structref, field, _) => {
                         let (structref, structty) = self.gen_expression(&structref, function)?;
