@@ -18,15 +18,17 @@ macro_rules! unwrap_some {
 }
 
 #[derive(Parser)]
-#[command(version, about, long_about = None)]
+#[command(version = "0.0.1", about, long_about = "A compiler for Book.")]
 pub struct Cli {
     /// todo: Sets a custom config file
     #[arg(short, long, value_name = "CONFIG")]
     pub config: Option<PathBuf>,
 
-    /// todo: Turn debugging information on
     #[arg(short, long, action = clap::ArgAction::Count)]
     pub debug: u8,
+
+    #[arg(short = 'O', long, default_value_t = 2)]
+    pub optimisation_level: u8,
 
     #[command(subcommand)]
     pub command: Commands,

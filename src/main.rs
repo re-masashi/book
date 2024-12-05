@@ -31,20 +31,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .init();
 
+    let optimisation_level = cli.optimisation_level;
+
     match &cli.command {
         Commands::Run { file } => {
-            build_file(file)?;
+            build_file(file, optimisation_level)?;
             run_file(file)?;
         }
         Commands::Build { file } => {
-            build_file(file)?;
+            build_file(file, optimisation_level)?;
         }
     }
 
     Ok(())
 }
 
-fn build_file(source_path: &String) -> Result<(), Box<dyn std::error::Error>> {
+fn build_file(
+    source_path: &String,
+    optimisation_level: u8,
+) -> Result<(), Box<dyn std::error::Error>> {
     trace!("`{source_path}` File is being read");
     let lexer = Lexer::from_file(source_path)?;
     let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
@@ -74,7 +79,7 @@ fn build_file(source_path: &String) -> Result<(), Box<dyn std::error::Error>> {
     let mut generator = IRGenerator::new(&context, source_path.to_string());
 
     trace!("Starting codegen");
-    generator.gen_program(&typed_ast)?;
+    generator.gen_program(&typed_ast, optimisation_level)?;
     let exec_name = &(source_path.to_owned()[..=source_path.len() - 4].to_string() + ".out");
     println!("executable `{}` created successfully", exec_name.green());
     Ok(())

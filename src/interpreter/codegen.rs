@@ -167,7 +167,11 @@ impl<'ctx> IRGenerator<'ctx> {
         let _free_func = self.module.add_function("GC_free", free_type, None);
     }
 
-    pub fn gen_program(&mut self, node: &TypedNode<'ctx>) -> Result<(), String> {
+    pub fn gen_program(
+        &mut self,
+        node: &TypedNode<'ctx>,
+        optimisation_level: u8,
+    ) -> Result<(), String> {
         self.declare_gc_functions();
         self.variables.insert(
             "type".to_string(),
@@ -352,7 +356,12 @@ impl<'ctx> IRGenerator<'ctx> {
 
         Target::initialize_x86(&InitializationConfig::default());
 
-        let opt = OptimizationLevel::Aggressive;
+        let opt = match optimisation_level {
+            0 => OptimizationLevel::None,
+            1 => OptimizationLevel::Less,
+            2 => OptimizationLevel::Default,
+            _ => OptimizationLevel::Aggressive,
+        };
         let reloc = RelocMode::PIC;
         let model = CodeModel::Default;
         let binding = self.file.clone() + ".o";
@@ -366,32 +375,34 @@ impl<'ctx> IRGenerator<'ctx> {
             Ok(_) => {}
             Err(e) => return Err(format!("couldn't verify the module!. {}", e)),
         };
-        // self.module
-        //     .run_passes(
-        //         "tailcallelim,\
-        //         mem2reg,\
-        //         bdce,\
-        //         dce,\
-        //         dse,\
-        //         instcombine,\
-        //         consthoist,\
-        //         loop-deletion,\
-        //         loop-data-prefetch,\
-        //         loop-distribute,\
-        //         loop-flatten,\
-        //         loop-fusion,\
-        //         loop-load-elim,\
-        //         loop-reduce,\
-        //         loop-unroll,\
-        //         loop-rotate,\
-        //         loop-simplify,\
-        //         loop-sink,\
-        //         loop-vectorize,\
-        //         unify-loop-exits",
-        //         &target_machine,
-        //         inkwell::passes::PassBuilderOptions::create(),
-        //     )
-        //     .unwrap();
+        if optimisation_level != 0{
+            self.module
+                .run_passes(
+                    "tailcallelim,\
+                    mem2reg,\
+                    bdce,\
+                    dce,\
+                    dse,\
+                    instcombine,\
+                    consthoist,\
+                    loop-deletion,\
+                    loop-data-prefetch,\
+                    loop-distribute,\
+                    loop-flatten,\
+                    loop-fusion,\
+                    loop-load-elim,\
+                    loop-reduce,\
+                    loop-unroll,\
+                    loop-rotate,\
+                    loop-simplify,\
+                    loop-sink,\
+                    loop-vectorize,\
+                    unify-loop-exits",
+                    &target_machine,
+                    inkwell::passes::PassBuilderOptions::create(),
+                )
+                .unwrap();
+        }
 
         self.print_ir();
 
