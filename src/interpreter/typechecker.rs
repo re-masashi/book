@@ -404,9 +404,9 @@ impl<'a> TypeEnv {
                             tvar!(self.0.len()+1),
                         );
                         self.0.insert(name.to_string(), type_.clone().into());
-                        let (ret, ret_type) = self.expr_to_type(ret, substitutions);
-                        unify(tvar!(self.0.len()+1), ret_type, substitutions);
-                        let retval = TypedNode::Function(
+                        let (ret, _ret_type) = self.expr_to_type(ret, substitutions);
+                        // unify(tvar!(self.0.len()+1), ret_type, substitutions);
+                        return TypedNode::Function(
                             std::borrow::Cow::Borrowed(name),
                             args.iter()
                                 .map(|(arg, argtype)| {
@@ -417,7 +417,7 @@ impl<'a> TypeEnv {
                                 .collect(),
                             Box::new(ret),
                             type_.clone().into(),
-                        );
+                        )
                     }
                     let annoted_type = Type::Constructor(TypeConstructor {
                         name: ty.name.to_string(),
