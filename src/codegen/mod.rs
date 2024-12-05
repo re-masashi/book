@@ -128,7 +128,7 @@ pub enum TypedExpr<'a> {
         Option<Box<TypedExpr<'a>>>,
         Arc<Type>,
     ), // condition, if_branch, else_branch
-    Call(Box<TypedExpr<'a>>, Vec<Box<TypedExpr<'a>>>, Arc<Type>), // value to call, arguments
+    Call(Box<TypedExpr<'a>>, Vec<TypedExpr<'a>>, Arc<Type>), // value to call, arguments
     While(Box<TypedExpr<'a>>, Box<TypedExpr<'a>>, Arc<Type>), // condition, body
     Break,
     Continue,
@@ -170,14 +170,14 @@ pub enum Node<'a> {
     Extern(Cow<'a, str>, Vec<TypeAnnot>, TypeAnnot),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr<'a> {
     Let(Cow<'a, str>, Option<TypeAnnot>, Box<Expr<'a>>), // name, value
     Variable(Cow<'a, str>),                              // name
     Lambda(Vec<(Cow<'a, str>, Option<TypeAnnot>)>, Box<Expr<'a>>), // args, expression (aka body)
     Literal(Arc<Literal<'a>>),                           // literal
     If(Box<Expr<'a>>, Box<Expr<'a>>, Option<Box<Expr<'a>>>), // condition, if_branch, else_branch
-    Call(Box<Expr<'a>>, Vec<Box<Expr<'a>>>),             // value to call, arguments
+    Call(Box<Expr<'a>>, Vec<Expr<'a>>),                  // value to call, arguments
     While(Box<Expr<'a>>, Box<Expr<'a>>),                 // condition, body
     Break,
     Continue,
@@ -192,7 +192,7 @@ pub enum Expr<'a> {
     Assign(Box<Expr<'a>>, Box<Expr<'a>>), // variable name, expression
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Literal<'a> {
     Boolean(bool),
     Int(i64),
@@ -200,7 +200,7 @@ pub enum Literal<'a> {
     String(Cow<'a, str>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum BinaryOperator {
     Add,
     Sub,
@@ -216,13 +216,13 @@ pub enum BinaryOperator {
     GreaterEqual,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum UnaryOperator {
     Negate,
     Not,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct TypeAnnot {
     pub name: String,
     pub generics: Vec<String>,

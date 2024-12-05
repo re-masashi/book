@@ -156,7 +156,7 @@ impl<'a> TypeEnv {
                     Type::Variable(_) => {
                         let new_args = args
                             .iter()
-                            .map(|arg| Box::new(self.expr_to_type(arg, substitutions).0))
+                            .map(|arg| self.expr_to_type(arg, substitutions).0)
                             .collect::<Vec<_>>();
                         (
                             TypedExpr::Call(Box::new(value_), new_args, value_type.clone()),
@@ -166,7 +166,7 @@ impl<'a> TypeEnv {
                     Type::Function(_fn_args, ret_type) => {
                         let new_args = args
                             .iter()
-                            .map(|arg| Box::new(self.expr_to_type(arg, substitutions).0))
+                            .map(|arg| self.expr_to_type(arg, substitutions).0)
                             .collect::<Vec<_>>();
                         (
                             TypedExpr::Call(Box::new(value_), new_args, ret_type.clone()),
@@ -718,9 +718,7 @@ impl<'a> TypeEnv {
                     Box::new(self.substitute_type_vars_in_typed_expr(*func, substitutions));
                 let new_args = args
                     .into_iter()
-                    .map(|arg| {
-                        Box::new(self.substitute_type_vars_in_typed_expr(*arg, substitutions))
-                    })
+                    .map(|arg| self.substitute_type_vars_in_typed_expr(arg, substitutions))
                     .collect();
                 let new_ret_ty = Self::substitute_type_vars(ret_ty, substitutions);
                 TypedExpr::Call(new_func, new_args, new_ret_ty)

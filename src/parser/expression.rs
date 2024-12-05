@@ -25,6 +25,8 @@ fn tokentype_to_binop(tok: TokenType) -> BinaryOperator {
 impl<'a> Parser<'_> {
     pub fn parse_expression(&mut self) -> Result<Expr<'a>> {
         // println!("do {:?}", self.tokens.peek());
+        // println!("{:?}", self.tokens.peek());
+        // println!("{:#?}", self.tokens);
 
         let mut l_value = match self.advance().type_ {
             TokenType::Do => self.parse_do()?,
@@ -41,7 +43,8 @@ impl<'a> Parser<'_> {
             TokenType::Let => self.parse_let()?,
             TokenType::LParen => {
                 let mut v = self.parse_expression()?;
-                println!("{:?}", v);
+                // println!("{:?}", v);
+                println!("{:?}", self.tokens.peek());
                 match self.advance().type_ {
                     TokenType::RParen => {}
                     TokenType::Comma => v = self.parse_tuple(v)?,
@@ -88,10 +91,10 @@ impl<'a> Parser<'_> {
             } else {
                 return Err("unclosed delimiter ']' after array index.".to_string());
             }
-        }
 
-        if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
-            self.advance(); // eat trailing ','
+            if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
+                self.advance(); // eat trailing ','
+            }
         }
 
         while let TokenType::LParen = unwrap_some!(self.tokens.peek()).type_ {
@@ -103,7 +106,7 @@ impl<'a> Parser<'_> {
                 if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
                     break;
                 }
-                args.push(Box::new(self.parse_expression()?));
+                args.push(self.parse_expression()?);
                 if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                     self.advance(); // Eat ','
                     continue;
@@ -111,13 +114,13 @@ impl<'a> Parser<'_> {
             }
             l_value = Expr::Call(Box::new(l_value), args);
 
+            if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
+                self.advance(); // eat trailing ','
+            }
+
             if let TokenType::RParen = unwrap_some!(self.tokens.peek()).type_ {
                 self.advance(); // eat ')'
             }
-        }
-
-        if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
-            self.advance(); // eat trailing ','
         }
 
         while let TokenType::Dot = unwrap_some!(self.tokens.peek()).type_ {
@@ -188,7 +191,7 @@ impl<'a> Parser<'_> {
 
     fn parse_array(&mut self) -> Result<Expr<'a>> {
         let mut args = vec![];
-        println!("{:?}", self.tokens.peek());
+        // println!("{:?}", self.tokens.peek());
         loop {
             if unwrap_some!(self.tokens.peek()).type_ == TokenType::RBrack {
                 break;
@@ -215,6 +218,10 @@ impl<'a> Parser<'_> {
                 break;
             }
             vals.push(self.parse_expression()?);
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                self.advance(); // eat ')'
+                break;
+            }
             if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                 self.advance(); // eat ','
             } else {

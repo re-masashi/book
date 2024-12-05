@@ -120,12 +120,12 @@ impl Parser<'_> {
                 } else {
                     lines
                         .get(start_line - 1)
-                        .map(|l| format!("{} | {}", start_line + 1, l))
+                        .map(|l| format!("{} | {}", start_line, l))
                 };
                 let current_line = &lines[start_line];
                 let post_line = lines
-                    .get(end_line + 1)
-                    .map(|l| format!("{} | {}", end_line + 1, l));
+                    .get(start_line + 1)
+                    .map(|l| format!("{} | {}", start_line + 2, l));
 
                 // Create pointy indicators
                 let start_pointy = format!("{:~<width$}^", "", width = start_col + 1);
@@ -141,7 +141,7 @@ impl Parser<'_> {
                     "\n\
                      {}\n\
                      {} | {}\n\
-                     {}{}{}
+                     {}{}{}\n\
                      {}\n\
                      {}: {}\n\
                      at line {}:{} in file `{}`.",

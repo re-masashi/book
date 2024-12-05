@@ -12,6 +12,30 @@ impl<'a> Parser<'_> {
     pub fn parse_type(&mut self) -> Result<TypeAnnot> {
         let type_name = match self.advance().type_ {
             TokenType::Identifier(ref i) => i.to_string(),
+            TokenType::LParen => {
+                let mut vals = vec![];
+                loop {
+                    if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                        self.advance(); // eat ')'
+                        break;
+                    }
+                    vals.push(self.parse_type()?);
+                    if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                        self.advance(); // eat ')'
+                        break;
+                    }
+                    if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                        self.advance(); // eat ','
+                    } else {
+                        return Err(format!(
+                            "expected ',' or `)` in tuple type definition found {} instead",
+                            self.advance().type_
+                        ));
+                    }
+                }
+                println!("{:?}", vals);
+                todo!()
+            }
             x => return Err(format!("invalid type without an identifier. found `{}`", x)),
         };
         let mut generics = vec![];

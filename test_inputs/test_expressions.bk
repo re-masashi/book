@@ -31,13 +31,13 @@ let y: int = 21
 x+y
 
 # lambdas
-fn() 1
-fn (x: i32, y: i32) x+y;
+fn() 1;
+fn (x: int, y: int) x+y;
 
 # arrays
 
 [1, 2, 3,]; # else it parses the next array as an index
-[1212, 1, "salsa"]
+[1212, 1, if 1==1 then x else 1]
 
 # if else
 
@@ -67,3 +67,9 @@ a[calc()]
 ## struct access
 
 a.aa
+
+a.a.a.aa
+
+## tuples
+
+(1,2)
