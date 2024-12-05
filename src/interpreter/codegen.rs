@@ -375,7 +375,7 @@ impl<'ctx> IRGenerator<'ctx> {
             Ok(_) => {}
             Err(e) => return Err(format!("couldn't verify the module!. {}", e)),
         };
-        if optimisation_level != 0{
+        if optimisation_level != 0 {
             self.module
                 .run_passes(
                     "tailcallelim,\
