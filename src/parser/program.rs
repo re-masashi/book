@@ -1,4 +1,4 @@
-use crate::interpreter::Node;
+use crate::codegen::Node;
 use crate::lexer::tokens::{Span, Token, TokenType};
 use crate::lexer::Lexer;
 use crate::parser::Parser;

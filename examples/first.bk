@@ -16,11 +16,8 @@ end
 
 def count_to_1M_while() -> bool do
 	let n = 0
-	while n < 2_0 then do
+	while n < 2_0 then
 		n = n+1
-		if n==3 then
-			break
-	end
 end
 
 def handler(req: str) -> Response do

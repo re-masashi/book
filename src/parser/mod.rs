@@ -1,6 +1,6 @@
 use owo_colors::OwoColorize;
 
-use crate::interpreter::Expr;
+use crate::codegen::Expr;
 use crate::lexer::tokens::{Span, Token, TokenType};
 
 use std::fs::File;

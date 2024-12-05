@@ -3,7 +3,7 @@
 pub mod cfg;
 pub mod optimise_ast;
 // pub mod utils;
-pub mod codegen;
+pub mod generator;
 pub mod typechecker;
 
 #[cfg(test)]
@@ -450,8 +450,8 @@ pub fn insert_types() {
     let mut env = TypeEnv(HashMap::new());
     let ast = sample_ast();
     let (mut typed_ast, _) = env.expr_to_type(&ast, &mut HashMap::new());
-    crate::interpreter::optimise_ast::optimise(&mut typed_ast);
-    let mut cfg = crate::interpreter::cfg::ControlFlowGraph::new();
+    crate::codegen::optimise_ast::optimise(&mut typed_ast);
+    let mut cfg = crate::codegen::cfg::ControlFlowGraph::new();
     // println!("{:#?}", typed_ast);
     let binding = Expr::If(
         Box::new(Expr::Literal(Literal::Boolean(true).into())),

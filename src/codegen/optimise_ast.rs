@@ -1,4 +1,4 @@
-use crate::interpreter::{BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, TypedNode};
+use crate::codegen::{BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, TypedNode};
 use crate::tconst;
 use std::collections::HashMap;
 use std::sync::Arc;

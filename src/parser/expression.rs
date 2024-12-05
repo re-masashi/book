@@ -1,4 +1,4 @@
-use crate::interpreter::{BinaryOperator, Expr, Literal, UnaryOperator};
+use crate::codegen::{BinaryOperator, Expr, Literal, UnaryOperator};
 use crate::lexer::tokens::TokenType;
 use crate::parser::Parser;
 use crate::{unwrap_some, Result};

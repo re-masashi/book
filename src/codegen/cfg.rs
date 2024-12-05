@@ -3,7 +3,7 @@
 // see https://github.com/rust-lang/rust-clippy/issues/740
 // and https://github.com/rust-lang/rust-clippy/issues/13749 maybe
 
-use crate::interpreter::TypedExpr;
+use crate::codegen::TypedExpr;
 
 use std::collections::HashMap;
 #[derive(Debug, Clone)]

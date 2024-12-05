@@ -1,7 +1,7 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
-pub mod interpreter;
+pub mod codegen;
 pub mod lexer;
 pub mod parser;
 

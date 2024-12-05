@@ -3,7 +3,7 @@
 // see https://github.com/rust-lang/rust-clippy/issues/740
 // and https://github.com/rust-lang/rust-clippy/issues/13749 maybe
 
-use crate::interpreter::{Node, TypeAnnot};
+use crate::codegen::{Node, TypeAnnot};
 use crate::lexer::tokens::TokenType;
 use crate::parser::Parser;
 use crate::{unwrap_some, Result};

@@ -1,4 +1,4 @@
-use crate::interpreter::*;
+use crate::codegen::*;
 
 #[test]
 fn test_typechecker_inference() {

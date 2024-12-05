@@ -1,5 +1,5 @@
 use book::{
-    interpreter::{codegen::IRGenerator, TypeEnv},
+    codegen::{generator::IRGenerator, TypeEnv},
     lexer::{tokens::Span, tokens::Token, tokens::TokenType, Lexer},
     parser::Parser,
     Cli, Commands,
