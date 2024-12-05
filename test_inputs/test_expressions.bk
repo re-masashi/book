@@ -36,7 +36,7 @@ fn (x: i32, y: i32) x+y;
 
 # arrays
 
-[1, 2, 3,]
+[1, 2, 3,]; # else it parses the next array as an index
 [1212, 1, "salsa"]
 
 # if else

@@ -7,8 +7,7 @@ macro_rules! parse {
         let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
         tokens.push(Token {
             type_: TokenType::Int(0),
-            pos: 1,
-            line_no: 0,
+            span: Span((1, 0), (1, 0)),
             file: $source_path.to_string(),
         }); // HACK: adding a blank expression to the end of the parser. else, the last expression isn't parsed
         assert!(Parser::new(tokens.into_iter().peekable(), $source_path).parse_program().is_ok())
