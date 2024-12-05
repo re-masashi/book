@@ -1,8 +1,10 @@
-use crate::codegen::generator::{IRGenerator, IRType, IRValue, get_type_from_typed_expr};
-use crate::codegen::{Type, TypedExpr, Literal, TypeConstructor, BinaryOperator, UnaryOperator, TypedNode, TypeEnv};
+use crate::codegen::generator::{get_type_from_typed_expr, IRGenerator, IRType, IRValue};
+use crate::codegen::{
+    BinaryOperator, Literal, Type, TypeConstructor, TypeEnv, TypedExpr, TypedNode, UnaryOperator,
+};
 use crate::tconst;
 
-use inkwell::types::{BasicTypeEnum, BasicType};
+use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{
     BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, InstructionOpcode,
 };

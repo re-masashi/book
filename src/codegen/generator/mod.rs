@@ -7,8 +7,7 @@ use inkwell::targets::{
 };
 use inkwell::types::{BasicMetadataTypeEnum, BasicTypeEnum, StructType};
 use inkwell::values::{
-    BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue,
-    StructValue,
+    BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue, StructValue,
 };
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
@@ -19,17 +18,11 @@ use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 
-use crate::codegen::{
-    Literal, 
-    Type, 
-    TypeConstructor,
-    TypedExpr, 
-    TypedNode,
-};
+use crate::codegen::{Literal, Type, TypeConstructor, TypedExpr, TypedNode};
 use crate::{t_float, t_int, t_str, tconst};
 
-pub mod function;
 pub mod expression;
+pub mod function;
 
 pub struct IRGenerator<'ctx> {
     context: &'ctx Context,
