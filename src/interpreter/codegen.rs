@@ -1743,8 +1743,8 @@ impl<'ctx> IRGenerator<'ctx> {
                         let new_name = format!("{name}${}$", self.lambda_counter);
                         self.lambda_counter += 1;
 
-                        let TypedNode::Function(_, args, expr, ret) =
-                            typeenv.substitute_type_vars_in_typed_node(
+                        let TypedNode::Function(_, args, expr, ret) = typeenv
+                            .substitute_type_vars_in_typed_node(
                                 TypedNode::Function(
                                     new_name.clone().into(),
                                     new_typed_args,
@@ -1764,10 +1764,8 @@ impl<'ctx> IRGenerator<'ctx> {
                                 args.iter()
                                     .map(|(x, t)| (x.to_string(), t.clone()))
                                     .collect(),
-                                &typeenv.substitute_type_vars_in_typed_expr(
-                                    *expr,
-                                    &mut substitutions,
-                                ),
+                                &typeenv
+                                    .substitute_type_vars_in_typed_expr(*expr, &mut substitutions),
                                 Type::Function(
                                     args.iter().map(|(_, t)| (t.clone())).collect(),
                                     ret.clone(),
