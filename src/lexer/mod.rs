@@ -6,7 +6,7 @@ pub mod test_literals;
 pub mod test_operators;
 pub mod test_punctuators;
 
-use crate::lexer::tokens::{Token, TokenType};
+use crate::lexer::tokens::{Span, Token, TokenType};
 use crate::Result;
 use std::iter::Peekable;
 use std::vec::IntoIter;
@@ -86,6 +86,7 @@ impl Iterator for Lexer {
     fn next(&mut self) -> Option<Self::Item> {
         let token: Result<TokenType>;
         let current_char: char;
+        let start = (self.line_no, self.pos);
         // Find first non-whitespace character
         loop {
             match self.raw_data.next() {
@@ -329,10 +330,11 @@ impl Iterator for Lexer {
             return Some(Err("Unknown token".to_string()));
         }
 
+        let end = (self.line_no, self.pos);
+
         Some(Ok(Token {
             type_: token.unwrap(),
-            pos: self.pos,
-            line_no: self.line_no,
+            span: Span(start, end),
             file: self.file.clone(),
         }))
     }

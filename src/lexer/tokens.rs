@@ -141,7 +141,9 @@ impl std::fmt::Display for TokenType {
 #[derive(Debug, Clone)]
 pub struct Token {
     pub type_: TokenType,
-    pub pos: i32,
-    pub line_no: i32,
+    pub span: Span,
     pub file: String,
 }
+
+#[derive(Debug, Clone)]
+pub struct Span(pub (i32, i32), pub (i32, i32));

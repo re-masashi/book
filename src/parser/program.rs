@@ -1,5 +1,5 @@
 use crate::interpreter::Node;
-use crate::lexer::tokens::{Token, TokenType};
+use crate::lexer::tokens::{Span, Token, TokenType};
 use crate::lexer::Lexer;
 use crate::parser::Parser;
 use crate::{unwrap_some, Result};
@@ -175,31 +175,23 @@ impl<'a> Parser<'_> {
             ref x => return Err(format!("invalid `use` module. {x}")),
         };
         let lexer = Lexer::from_file(&modulename).unwrap();
-        let prevstate = (
-            self.pos,
-            self.line_no,
-            self.file.clone(),
-            self.tokens.clone(),
-        );
+        let prevstate = (self.span.clone(), self.file.clone(), self.tokens.clone());
         let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
         tokens.push(Token {
             type_: TokenType::Int(0),
-            pos: 1,
-            line_no: 0,
+            span: Span((0, 1), (0, 1)),
             file: modulename.to_string(),
         });
         self.tokens = tokens.into_iter().peekable();
         self.file = modulename.to_string();
-        self.line_no = 0;
-        self.pos = -1;
+        self.span = Span((0, -1), (0, -1));
         let Node::Program(ast) = self.parse_program()? else {
             unreachable!()
         };
 
-        self.pos = prevstate.0;
-        self.line_no = prevstate.1;
-        self.file = prevstate.2;
-        self.tokens = prevstate.3;
+        self.span = prevstate.0;
+        self.file = prevstate.1;
+        self.tokens = prevstate.2;
         Ok(Node::Program(ast.clone()))
     }
 }

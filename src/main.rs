@@ -1,6 +1,6 @@
 use book::{
     interpreter::{codegen::IRGenerator, TypeEnv},
-    lexer::{tokens::Token, tokens::TokenType, Lexer},
+    lexer::{tokens::Span, tokens::Token, tokens::TokenType, Lexer},
     parser::Parser,
     Cli, Commands,
 };
@@ -50,8 +50,7 @@ fn build_file(source_path: &String) -> Result<(), Box<dyn std::error::Error>> {
     let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
     tokens.push(Token {
         type_: TokenType::Int(0),
-        pos: 1,
-        line_no: 0,
+        span: Span((0, 1), (0, 1)),
         file: source_path.to_string(),
     }); // HACK: adding a blank expression to the end of the parser. else, the last expression isn't parsed
     let mut parser = Parser::new(tokens.into_iter().peekable(), source_path);

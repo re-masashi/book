@@ -1,9 +1,10 @@
 use owo_colors::OwoColorize;
 
 use crate::interpreter::Expr;
-use crate::lexer::tokens::{Token, TokenType};
+use crate::lexer::tokens::{Span, Token, TokenType};
 
-use std::fs::read_to_string;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 use std::iter::Peekable;
 use std::marker::PhantomData;
 use std::vec::IntoIter;
@@ -43,8 +44,7 @@ pub struct Class<'a> {
 /// A parser that generates an abstract syntax tree (AST).
 pub struct Parser<'a> {
     tokens: TokenIter,
-    pos: i32,
-    line_no: i32,
+    span: Span,
     file: String,
     phantom: PhantomData<&'a i32>,
 }
@@ -53,8 +53,7 @@ impl Parser<'_> {
     pub fn new(tokens: TokenIter, file_path: &str) -> Self {
         Parser {
             tokens,
-            pos: -1,
-            line_no: 1,
+            span: Span((-1, -1), (-1, -1)),
             file: file_path.to_string(),
             phantom: PhantomData,
         }
@@ -79,56 +78,96 @@ impl Parser<'_> {
             .tokens
             .next()
             .expect("Reached end of tokens unexpectedly");
-        self.pos = next_token.pos; // Assign directly
-        self.line_no = next_token.line_no;
+        self.span = next_token.span.clone();
         next_token
     }
 
     pub fn error(&self, message: String) {
-        let file_contents = match read_to_string(&self.file) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: Could not open file: {}. {}", self.file.green(), e);
-                return;
+        match File::open(&self.file) {
+            Ok(file) => {
+                let reader = BufReader::new(file);
+                let lines: Vec<String> = reader
+                    .lines()
+                    .map(|l| l.expect("Could not read line"))
+                    .collect();
+
+                let (start_line, start_col) = self.span.0;
+                let (end_line, end_col) = self.span.1;
+
+                // Adjust for 0-based indexing (lines and columns are 1-indexed)
+                let start_line = (start_line - 1) as usize;
+                let start_col = start_col as usize;
+                let end_line = (end_line - 1) as usize;
+                let end_col = end_col as usize;
+
+                // Validate line numbers and columns
+                if start_line >= lines.len()
+                    || end_line >= lines.len()
+                    || start_col > lines[start_line].len()
+                    || end_col > lines[end_line].len()
+                {
+                    eprintln!(
+                        "Invalid span: Line or column numbers out of bounds. {:?} {}",
+                        self.span,
+                        lines.len()
+                    );
+                    return;
+                }
+
+                // Extract relevant lines
+                let pre_line = if start_line == 0 {
+                    Some("".to_string())
+                } else {
+                    lines
+                        .get(start_line - 1)
+                        .map(|l| format!("{} | {}", start_line + 1, l))
+                };
+                let current_line = &lines[start_line];
+                let post_line = lines
+                    .get(end_line + 1)
+                    .map(|l| format!("{} | {}", end_line + 1, l));
+
+                // Create pointy indicators
+                let start_pointy = format!("{:~<width$}^", "", width = start_col + 1);
+                let end_pointy = format!("{:^<width$}^", "", width = end_col - start_col);
+                let padding = format!(
+                    "{: <width$}  ",
+                    "",
+                    width = (start_line + 1).ilog10() as usize
+                );
+
+                // Construct the error message
+                let error_message = format!(
+                    "\n\
+                     {}\n\
+                     {} | {}\n\
+                     {}{}{}
+                     {}\n\
+                     {}: {}\n\
+                     at line {}:{} in file `{}`.",
+                    pre_line.unwrap_or_default().yellow(),
+                    (start_line + 1).green(),
+                    current_line.yellow(),
+                    padding,
+                    start_pointy.red(),
+                    end_pointy.red(),
+                    post_line.unwrap_or_default().yellow(),
+                    "[Syntax Error]".red(),
+                    message,
+                    (start_line + 1).green(),
+                    (start_col + 1).green(),
+                    self.file.green(),
+                );
+
+                eprintln!("{}", error_message);
             }
-        };
-
-        let file_lines: Vec<_> = file_contents.lines().collect();
-        let line_index = self.line_no as usize - 1;
-
-        // More concise and safe way to get lines before/after
-        let pre_line = if line_index > 1 {
-            format!("{} | {}\n", line_index, file_lines[line_index - 1])
-        } else {
-            "".to_string()
-        };
-        let current_line = file_lines.get(line_index).unwrap_or(&"");
-        let post_line = file_lines.get(line_index + 1).unwrap_or(&"");
-
-        let pointy_binding = format!("{:~<width$}^", "", width = (self.pos + 1) as usize);
-        let pointy = pointy_binding.red();
-
-        let error_message = format!(
-            "\n\
-             {}\
-             {} | {}\n\
-             {}\n\
-             {} | {}\n\
-             {}: {}\n\
-             at {}:{} in file `{}`.",
-            pre_line.yellow(),
-            self.line_no.green(),
-            current_line.yellow(),
-            pointy,
-            (self.line_no + 1).green(),
-            post_line.yellow(),
-            "[Syntax Error]".red(),
-            message,
-            self.line_no.green(),
-            self.pos.green(),
-            self.file.green(),
-        );
-
-        eprintln!("{}", error_message);
+            Err(error) => {
+                eprintln!(
+                    "Error: Could not open file: {}. {}",
+                    self.file.green(),
+                    error
+                );
+            }
+        }
     }
 }
