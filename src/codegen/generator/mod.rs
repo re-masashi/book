@@ -23,6 +23,8 @@ use crate::lexer::tokens::Span;
 use crate::{t_float, t_int, t_str, tconst};
 
 pub mod expression;
+pub mod gen_call;
+pub mod gen_binop;
 pub mod function;
 
 pub struct IRGenerator<'ctx> {
@@ -191,6 +193,10 @@ impl<'ctx> IRGenerator<'ctx> {
             "str".to_string(),
             (IRValue::BuiltIn("str".to_string()), IRType::BuiltIn),
         );
+        self.variables.insert(
+            "array".to_string(),
+            (IRValue::BuiltIn("array".to_string()), IRType::BuiltIn),
+        );
 
         self.gen_extern("printint".to_string(), vec![t_int!()], t_int!())?;
         self.gen_extern("printstr".to_string(), vec![t_str!()], t_str!())?;
@@ -229,7 +235,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         TypedNode::Extern(name, args, ret) => {
                             self.gen_extern(name.to_string(), args.to_vec(), ret.clone())?;
                         }
-                        TypedNode::Struct(name, _generics, fields) => {
+                        TypedNode::Struct(name, generics, fields) => {
                             let mut arg_types = vec![];
                             let mut field_types = vec![];
                             let mut field_metadata_types = vec![];
@@ -253,6 +259,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                         .as_meta_enum(self.context),
                                 );
                             }
+                            // println!("");
 
                             let struct_type = self.context.struct_type(&field_types, false);
                             let struct_size = struct_type.size_of().unwrap();
@@ -490,7 +497,8 @@ impl<'ctx> IRGenerator<'ctx> {
                     None => panic!("no such struct `{x}`"),
                 },
             },
-            Type::Struct(_name, _, _fields) => {
+            Type::Struct(_name, _generics, _fields) => {
+                // println!("{:?}", generics);
                 IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into())
             }
             _ => panic!("{:?}", ty),

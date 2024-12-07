@@ -9,16 +9,9 @@ struct Response
 	close int
 end
 
-def count_to_1M(n: int) -> int do
+def count_to_1M(n: int) -> int
 	if n < 1_000_000 then
 		count_to_1M(n+1)
-end
-
-def count_to_1M_while() -> bool do
-	let n = 0
-	while n < 2_0 then
-		n = n+1
-end
 
 def handler(req: str) -> Response do
 	print("OK\n")
@@ -37,4 +30,7 @@ end
 
 println(type("abcd"))
 println(type(11))
-count_to_1M_while()
+
+let list: Array<str> = array(4, "")
+list[0] = "hello cro"
+println(list[0])
