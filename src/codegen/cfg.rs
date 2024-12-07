@@ -54,7 +54,7 @@ impl<'a> ControlFlowGraph<'a> {
     ) -> usize {
         //'
         match expr {
-            TypedExpr::If(condition, if_branch, else_branch, _) => {
+            TypedExpr::If(condition, if_branch, else_branch, _, _span, _file) => {
                 let cond_id = self.add_node(Node::Condition(*condition));
                 let mut then_block = Vec::new();
                 let then_end = self.build_from_expr(*if_branch, &mut then_block);
@@ -80,7 +80,7 @@ impl<'a> ControlFlowGraph<'a> {
                 self.add_edge(else_end, merge_id);
                 merge_id
             }
-            TypedExpr::While(condition, body, _) => {
+            TypedExpr::While(condition, body, _, _span, _file) => {
                 let cond_id = self.add_node(Node::Condition(*condition));
 
                 let mut body_block = Vec::new();
@@ -96,7 +96,7 @@ impl<'a> ControlFlowGraph<'a> {
 
                 merge_id // Return the merge node id
             }
-            TypedExpr::BinaryOp(ref lhs, op, ref rhs, ref type_) => {
+            TypedExpr::BinaryOp(ref lhs, op, ref rhs, ref type_, span, ref file) => {
                 let _lhs_id = self.build_from_expr(*lhs.clone(), current_block);
                 let _rhs_id = self.build_from_expr(*rhs.clone(), current_block);
 
@@ -105,6 +105,8 @@ impl<'a> ControlFlowGraph<'a> {
                     op,
                     Box::new(expr.clone()),
                     type_.clone(),
+                    span,
+                    file.clone(),
                 ));
 
                 let block_id = self.add_node(Node::BasicBlock(current_block.clone())); // Create the basic block

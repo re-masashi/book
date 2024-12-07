@@ -1,7 +1,5 @@
 use crate::codegen::generator::{get_type_from_typed_expr, IRGenerator, IRType, IRValue};
-use crate::codegen::{
-    BinaryOperator, Literal, Type, TypeConstructor, TypeEnv, TypedExpr, TypedNode, UnaryOperator,
-};
+use crate::codegen::{BinaryOperator, Literal, Type, TypeConstructor, TypedExpr, UnaryOperator};
 use crate::tconst;
 
 use inkwell::types::{BasicType, BasicTypeEnum};
@@ -11,7 +9,7 @@ use inkwell::values::{
 use inkwell::AddressSpace;
 use inkwell::{FloatPredicate, IntPredicate};
 
-use std::collections::HashMap;
+// use std::collections::HashMap;
 use std::sync::Arc;
 
 impl<'ctx> IRGenerator<'ctx> {
@@ -21,7 +19,7 @@ impl<'ctx> IRGenerator<'ctx> {
         function: FunctionValue<'ctx>,
     ) -> Result<(IRValue<'ctx>, IRType<'ctx>), String> {
         match expression {
-            TypedExpr::Let(name, expr, type_) => {
+            TypedExpr::Let(name, expr, type_, _span, _file) => {
                 let (val, ty) = self.gen_expression(expr, function)?;
                 let alloca = self
                     .builder
@@ -39,30 +37,32 @@ impl<'ctx> IRGenerator<'ctx> {
                 );
                 Ok((IRValue::Simple(alloca.into()), ty))
             }
-            TypedExpr::Variable(name, _type_) => match self.variables.get(&name.to_string()) {
-                Some((value, type_)) => {
-                    if let IRType::Function(..) = type_ {
-                        return Ok((value.clone(), type_.clone()));
+            TypedExpr::Variable(name, _type_, _span, _file) => {
+                match self.variables.get(&name.to_string()) {
+                    Some((value, type_)) => {
+                        if let IRType::Function(..) = type_ {
+                            return Ok((value.clone(), type_.clone()));
+                        }
+                        if let IRType::PolyMorph = type_ {
+                            return Ok((value.clone(), type_.clone()));
+                        }
+                        if let IRType::BuiltIn = type_ {
+                            return Ok((value.clone(), type_.clone()));
+                        }
+                        let value = self
+                            .builder
+                            .build_load(
+                                type_.as_basic_enum(self.context),
+                                value.as_basic_enum(self.context).into_pointer_value(),
+                                name,
+                            )
+                            .unwrap();
+                        Ok((IRValue::Simple(value), type_.clone()))
                     }
-                    if let IRType::PolyMorph = type_ {
-                        return Ok((value.clone(), type_.clone()));
-                    }
-                    if let IRType::BuiltIn = type_ {
-                        return Ok((value.clone(), type_.clone()));
-                    }
-                    let value = self
-                        .builder
-                        .build_load(
-                            type_.as_basic_enum(self.context),
-                            value.as_basic_enum(self.context).into_pointer_value(),
-                            name,
-                        )
-                        .unwrap();
-                    Ok((IRValue::Simple(value), type_.clone()))
+                    None => Err(format!("Variable '{}' not found", name)),
                 }
-                None => Err(format!("Variable '{}' not found", name)),
-            },
-            TypedExpr::Lambda(args, body, return_type_) => {
+            }
+            TypedExpr::Lambda(args, body, return_type_, _span, _file) => {
                 // Create a new function for the lambda
                 let lambda_name = format!("lambda_{}", self.lambda_counter);
                 self.lambda_counter += 1;
@@ -85,8 +85,8 @@ impl<'ctx> IRGenerator<'ctx> {
                     lambda_type,
                 ))
             }
-            TypedExpr::Literal(lit, _) => Ok(self.gen_literal(lit)),
-            TypedExpr::If(cond, if_, else_, type_) => {
+            TypedExpr::Literal(lit, _, _span, _file) => Ok(self.gen_literal(lit)),
+            TypedExpr::If(cond, if_, else_, type_, _span, _file) => {
                 let (cond_val, _) = self.gen_expression(cond, function)?;
                 let then_bb = self.context.append_basic_block(function, "then");
                 let merge_bb = self.context.append_basic_block(function, "merge");
@@ -237,7 +237,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
                 Ok((IRValue::Simple(phi.as_basic_value()), then_ty))
             }
-            TypedExpr::BinaryOp(lhs, op, rhs, _type_) => {
+            TypedExpr::BinaryOp(lhs, op, rhs, _type_, _span, _file) => {
                 let (lhs_val, lhs_type) = self.gen_expression(&(lhs.clone()), function)?;
                 let (rhs_val, rhs_type) = self.gen_expression(&(rhs.clone()), function)?;
 
@@ -731,7 +731,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 };
                 Ok((IRValue::Simple(result), IRType::Simple(lhs_type)))
             }
-            TypedExpr::Call(callee, args, type_) => {
+            TypedExpr::Call(callee, args, _type_, _span, _file) => {
                 match self.gen_expression(callee, function)? {
                     (IRValue::BuiltIn(name), IRType::BuiltIn) => {
                         match name.as_str() {
@@ -1153,101 +1153,102 @@ impl<'ctx> IRGenerator<'ctx> {
                             _ => unreachable!(),
                         }
                     }
-                    (IRValue::PolyMorph(name, expr, polyargs, _ret), IRType::PolyMorph) => {
-                        let mut new_typed_args = vec![];
-                        let arg_exprs = args;
-                        let continuation_bb = function.get_last_basic_block().unwrap();
+                    (IRValue::PolyMorph(_name, _expr, _polyargs, _ret), IRType::PolyMorph) => {
+                        todo!("needs work")
+                        // let mut new_typed_args = vec![];
+                        // let arg_exprs = args;
+                        // let continuation_bb = function.get_last_basic_block().unwrap();
 
-                        let mut typeenv = TypeEnv(HashMap::new());
+                        // let mut typeenv = TypeEnv(HashMap::new());
 
-                        if args.len() != polyargs.len() {
-                            return Err("Invalid number of args".to_string());
-                        }
-                        let mut substitutions = HashMap::new();
+                        // if args.len() != polyargs.len() {
+                        //     return Err("Invalid number of args".to_string());
+                        // }
+                        // let mut substitutions = HashMap::new();
 
-                        for (i, arg) in args.iter().enumerate() {
-                            let ty = get_type_from_typed_expr(arg);
-                            if let Type::Variable(v) = polyargs[i].1.as_ref() {
-                                substitutions.insert(*v, ty.clone());
-                            }
-                            new_typed_args.push((polyargs[i].0.clone().into(), ty));
-                        }
+                        // for (i, arg) in args.iter().enumerate() {
+                        //     let ty = get_type_from_typed_expr(arg);
+                        //     if let Type::Variable(v) = polyargs[i].1.as_ref() {
+                        //         substitutions.insert(*v, ty.clone());
+                        //     }
+                        //     new_typed_args.push((polyargs[i].0.clone().into(), ty));
+                        // }
 
-                        let new_name = format!("{name}${}$", self.lambda_counter);
-                        self.lambda_counter += 1;
+                        // let new_name = format!("{name}${}$", self.lambda_counter);
+                        // self.lambda_counter += 1;
 
-                        let TypedNode::Function(_, args, expr, ret) = typeenv
-                            .substitute_type_vars_in_typed_node(
-                                TypedNode::Function(
-                                    new_name.clone().into(),
-                                    new_typed_args,
-                                    expr,
-                                    type_.clone(),
-                                ),
-                                &mut substitutions,
-                            )
-                        else {
-                            unreachable!()
-                        };
-                        println!("{:?}", substitutions);
+                        // let TypedNode::Function(_, args, expr, ret) = typeenv
+                        //     .substitute_type_vars_in_typed_node(
+                        //         TypedNode::Function(
+                        //             new_name.clone().into(),
+                        //             new_typed_args,
+                        //             expr,
+                        //             type_.clone(),
+                        //         ),
+                        //         &mut substitutions,
+                        //     )
+                        // else {
+                        //     unreachable!()
+                        // };
+                        // println!("{:?}", substitutions);
 
-                        let (IRValue::Function(function_to_call, _, _), _fn_type) = self
-                            .gen_function(
-                                new_name.clone(),
-                                args.iter()
-                                    .map(|(x, t)| (x.to_string(), t.clone()))
-                                    .collect(),
-                                &typeenv
-                                    .substitute_type_vars_in_typed_expr(*expr, &mut substitutions),
-                                Type::Function(
-                                    args.iter().map(|(_, t)| (t.clone())).collect(),
-                                    ret.clone(),
-                                )
-                                .into(),
-                            )?
-                        else {
-                            unreachable!()
-                        };
+                        // let (IRValue::Function(function_to_call, _, _), _fn_type) = self
+                        //     .gen_function(
+                        //         new_name.clone(),
+                        //         args.iter()
+                        //             .map(|(x, t)| (x.to_string(), t.clone()))
+                        //             .collect(),
+                        //         &typeenv
+                        //             .substitute_type_vars_in_typed_expr(*expr, &mut substitutions),
+                        //         Type::Function(
+                        //             args.iter().map(|(_, t)| (t.clone())).collect(),
+                        //             ret.clone(),
+                        //         )
+                        //         .into(),
+                        //     )?
+                        // else {
+                        //     unreachable!()
+                        // };
 
-                        self.builder.position_at_end(continuation_bb);
+                        // self.builder.position_at_end(continuation_bb);
 
-                        // todo!()
-                        // type check to see if all expressions are valid
-                        // i'll add it later. let me just make a prototype.
+                        // // todo!()
+                        // // type check to see if all expressions are valid
+                        // // i'll add it later. let me just make a prototype.
 
-                        /*
-                        Then, we look up all the instances of this function in self.polymorphic_functions.
-                        if the argument types match, we use that function.
-                        else, we compile a new version.
-                        I'll do it later. Compile everything freshly for now.
-                        */
+                        // /*
+                        // Then, we look up all the instances of this function in self.polymorphic_functions.
+                        // if the argument types match, we use that function.
+                        // else, we compile a new version.
+                        // I'll do it later. Compile everything freshly for now.
+                        // */
 
-                        let mut compiled_args: Vec<BasicValueEnum> = vec![];
+                        // let mut compiled_args: Vec<BasicValueEnum> = vec![];
 
-                        arg_exprs.iter().for_each(|arg| {
-                            compiled_args.push(
-                                self.gen_expression(arg, function)
-                                    .unwrap()
-                                    .0
-                                    .as_basic_enum(self.context),
-                            )
-                        });
+                        // arg_exprs.iter().for_each(|arg| {
+                        //     compiled_args.push(
+                        //         self.gen_expression(arg, function)
+                        //             .unwrap()
+                        //             .0
+                        //             .as_basic_enum(self.context),
+                        //     )
+                        // });
 
-                        let argsv: Vec<BasicMetadataValueEnum> = compiled_args
-                            .iter()
-                            .by_ref()
-                            .map(|&val| val.into())
-                            .collect();
+                        // let argsv: Vec<BasicMetadataValueEnum> = compiled_args
+                        //     .iter()
+                        //     .by_ref()
+                        //     .map(|&val| val.into())
+                        //     .collect();
 
-                        match self.builder.build_call(function_to_call, &argsv, "calltmp") {
-                            Ok(call_site_value) => Ok((
-                                IRValue::Simple(
-                                    call_site_value.try_as_basic_value().left().unwrap(),
-                                ),
-                                self.type_to_llvm(ret),
-                            )),
-                            Err(e) => Err(e.to_string()),
-                        }
+                        // match self.builder.build_call(function_to_call, &argsv, "calltmp") {
+                        //     Ok(call_site_value) => Ok((
+                        //         IRValue::Simple(
+                        //             call_site_value.try_as_basic_value().left().unwrap(),
+                        //         ),
+                        //         self.type_to_llvm(ret),
+                        //     )),
+                        //     Err(e) => Err(e.to_string()),
+                        // }
                     }
                     (IRValue::Function(fn_, _, _), IRType::Function(_args_, ret)) => {
                         let function_to_call = fn_;
@@ -1281,7 +1282,7 @@ impl<'ctx> IRGenerator<'ctx> {
                     _ => panic!("invalid call!"),
                 }
             }
-            TypedExpr::UnaryOp(op, expr, type_) => {
+            TypedExpr::UnaryOp(op, expr, type_, _span, _file) => {
                 let (val, val_type) = self.gen_expression(expr, function)?;
                 let val = val.as_basic_enum(self.context);
 
@@ -1310,7 +1311,7 @@ impl<'ctx> IRGenerator<'ctx> {
                     )),
                 }
             }
-            TypedExpr::Array(elements, type_) => {
+            TypedExpr::Array(elements, type_, _span, _file) => {
                 let element_type = match type_.as_ref() {
                     Type::Constructor(TypeConstructor {
                         name: _,  // always equals "Array"
@@ -1360,7 +1361,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 // global_array.set_initializer(&array_value);
                 // Ok(global_array.as_pointer_value().as_basic_value_enum())
             }
-            TypedExpr::While(cond, body, _type_) => {
+            TypedExpr::While(cond, body, _type_, _span, _file) => {
                 // match **body {
                 //     TypedExpr::Break => {
                 //         return Ok((
@@ -1426,10 +1427,9 @@ impl<'ctx> IRGenerator<'ctx> {
                     IRType::Simple(self.context.i32_type().into()),
                 ))
             }
-            TypedExpr::Do(expressions, type_) => {
+            TypedExpr::Do(expressions, type_, _span, _file) => {
                 let mut exprs = vec![];
-                let mut expressions_ =
-                    vec![TypedExpr::Literal(Literal::Int(0).into(), tconst!("int"))];
+                let mut expressions_ = vec![];
                 expressions_.append(&mut expressions.clone());
 
                 for expr in expressions_ {
@@ -1455,7 +1455,7 @@ impl<'ctx> IRGenerator<'ctx> {
                     Some(v) => Ok((v.clone(), self.type_to_llvm(type_.clone()))),
                 }
             }
-            TypedExpr::Index(array_expr, index_expr, type_) => {
+            TypedExpr::Index(array_expr, index_expr, type_, _span, _file) => {
                 // println!("1");
                 let array_ptr = self
                     .gen_expression(array_expr, function)?
@@ -1490,7 +1490,7 @@ impl<'ctx> IRGenerator<'ctx> {
                     .unwrap();
                 Ok((IRValue::Simple(field_val), self.type_to_llvm(type_.clone())))
             }
-            TypedExpr::StructAccess(structref, field, _ty) => {
+            TypedExpr::StructAccess(structref, field, _ty, _span, _file) => {
                 let (structref, structty) = self.gen_expression(structref, function)?;
                 let (struct_type, fields) = match structty {
                     IRType::Struct(struct_type, fields) => (struct_type, fields),
@@ -1516,7 +1516,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 }
                 Err("no such field found in the given struct".to_string())
             }
-            TypedExpr::Return(expr, _return_type) => {
+            TypedExpr::Return(expr, _return_type, _span, _file) => {
                 let (val, ty) = self.gen_expression(expr, function)?;
                 match self
                     .builder
@@ -1546,11 +1546,11 @@ impl<'ctx> IRGenerator<'ctx> {
                 ))
             }
             TypedExpr::Tuple(..) => todo!(),
-            TypedExpr::Assign(lhs, expr, _type_) => {
+            TypedExpr::Assign(lhs, expr, _type_, _span, _file) => {
                 let (val, ty) = self.gen_expression(&expr.clone(), function)?;
 
                 match *lhs.clone() {
-                    TypedExpr::Variable(name, _) => {
+                    TypedExpr::Variable(name, _, _span, _file) => {
                         // Get the variable's alloca
                         let var_alloca = self
                             .variables
@@ -1566,7 +1566,7 @@ impl<'ctx> IRGenerator<'ctx> {
                             .unwrap();
                         Ok((val, ty))
                     }
-                    TypedExpr::Index(array_expr, index_expr, type_) => {
+                    TypedExpr::Index(array_expr, index_expr, type_, _span, _file) => {
                         // println!("1");
                         let array_ptr = self
                             .gen_expression(&array_expr, function)?
@@ -1604,7 +1604,7 @@ impl<'ctx> IRGenerator<'ctx> {
                             .unwrap();
                         Ok((IRValue::Simple(field_val), self.type_to_llvm(type_.clone())))
                     }
-                    TypedExpr::StructAccess(structref, field, _) => {
+                    TypedExpr::StructAccess(structref, field, _, _span, _file) => {
                         let (structref, structty) = self.gen_expression(&structref, function)?;
                         let (struct_type, fields) = match structty {
                             IRType::Struct(struct_type, fields) => (struct_type, fields),
@@ -1645,7 +1645,7 @@ impl<'ctx> IRGenerator<'ctx> {
                     _ => Err("tried to assign to invalid value".to_string()),
                 }
             }
-            TypedExpr::Break => {
+            TypedExpr::Break(..) => {
                 match self.loop_bbs {
                     Some((_, after_bb)) => {
                         self.builder.build_unconditional_branch(after_bb).unwrap();
@@ -1657,7 +1657,7 @@ impl<'ctx> IRGenerator<'ctx> {
                     IRType::Simple(self.context.i32_type().into()),
                 ))
             }
-            TypedExpr::Continue => {
+            TypedExpr::Continue(..) => {
                 match self.loop_bbs {
                     Some((body_bb, _)) => {
                         self.builder.build_unconditional_branch(body_bb).unwrap();

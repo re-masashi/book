@@ -4,7 +4,7 @@
 // and https://github.com/rust-lang/rust-clippy/issues/13749 maybe
 
 use crate::codegen::{Node, TypeAnnot};
-use crate::lexer::tokens::TokenType;
+use crate::lexer::tokens::{Span, TokenType};
 use crate::parser::Parser;
 use crate::{unwrap_some, Result};
 
@@ -67,26 +67,21 @@ impl<'a> Parser<'_> {
         })
     }
 
-    pub fn parse_function(&mut self) -> Result<Node<'a>> {
+    pub fn parse_function(&mut self) -> Result<(Node<'a>, Span)> {
         // always returns a function node
         // println!("def {:?}", self.tokens.peek());
         // println!("toks {:#?}", self.tokens);
 
         self.advance(); // eat 'def'
-                        // let mut name = "".to_string();
+        let mut span = self.span;
         let mut ret_type = None;
         let mut args = vec![];
-        // println!("def after def {:?}", self.tokens.peek());
 
         let token = self.advance();
         let name = match token.type_ {
-            TokenType::Identifier(ref n) => {
-                n.clone()
-                // println!("found a function named {:?}", n);
-            }
+            TokenType::Identifier(ref n) => n.clone(),
             ref x => return Err(format!("expected a function name after 'def'. found {}", x)),
         };
-        // println!("def after name {:?}", self.tokens.peek());
 
         let token = self.advance();
         match token.type_ {
@@ -95,7 +90,6 @@ impl<'a> Parser<'_> {
                     self.advance(); // Eat ')'
                 } else {
                     loop {
-                        // println!("def after '(' {:?}", self.tokens.peek());
                         match unwrap_some!(self.tokens.peek()).type_ {
                             TokenType::Identifier(ref argname) => {
                                 let argname_clone = std::borrow::Cow::Owned(argname.clone());
@@ -133,12 +127,16 @@ impl<'a> Parser<'_> {
             ret_type = Some(self.parse_type()?);
         };
         // println!("function body {:?}", self.tokens.peek());
+        span.1 = self.span.1;
 
-        Ok(Node::Function(
-            std::borrow::Cow::Owned(name),
-            args,
-            Box::new(self.parse_expression()?),
-            ret_type,
+        Ok((
+            Node::Function(
+                std::borrow::Cow::Owned(name),
+                args,
+                Box::new(self.parse_expression()?.0),
+                ret_type,
+            ),
+            span,
         ))
     }
 }

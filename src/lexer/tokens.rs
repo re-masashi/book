@@ -145,5 +145,5 @@ pub struct Token {
     pub file: String,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Span(pub (i32, i32), pub (i32, i32));

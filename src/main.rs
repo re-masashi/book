@@ -64,7 +64,7 @@ fn build_file(
     let mut substitutions = HashMap::new();
 
     trace!("Parsing started");
-    let ast = match parser.parse_program() {
+    let (ast, span, file) = match parser.parse_program() {
         Ok(ast) => ast,
         Err(e) => {
             parser.error(e);
@@ -72,14 +72,20 @@ fn build_file(
         }
     };
     trace!("Typechecking started");
-    let typed_ast = env.node_to_type(&ast, &mut substitutions);
+    let typed_ast = match env.node_to_type(&ast, &span, &file, &mut substitutions) {
+        Ok(ast) => ast,
+        Err(e) => {
+            env.error(&e);
+            process::exit(0);
+        }
+    };
 
     trace!("Creating inkwell context");
     let context = inkwell::context::Context::create();
     let mut generator = IRGenerator::new(&context, source_path.to_string());
 
     trace!("Starting codegen");
-    generator.gen_program(&typed_ast, optimisation_level)?;
+    generator.gen_program(&typed_ast, &span, file, optimisation_level)?;
     let exec_name = &(source_path.to_owned()[..=source_path.len() - 4].to_string() + ".out");
     println!("executable `{}` created successfully", exec_name.green());
     Ok(())

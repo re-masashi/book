@@ -78,7 +78,7 @@ impl Parser<'_> {
             .tokens
             .next()
             .expect("Reached end of tokens unexpectedly");
-        self.span = next_token.span.clone();
+        self.span = next_token.span;
         next_token
     }
 

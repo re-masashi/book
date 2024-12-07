@@ -19,6 +19,7 @@ use std::process::Command;
 use std::sync::Arc;
 
 use crate::codegen::{Literal, Type, TypeConstructor, TypedExpr, TypedNode};
+use crate::lexer::tokens::Span;
 use crate::{t_float, t_int, t_str, tconst};
 
 pub mod expression;
@@ -169,6 +170,8 @@ impl<'ctx> IRGenerator<'ctx> {
     pub fn gen_program(
         &mut self,
         node: &TypedNode<'ctx>,
+        _span: &Span,
+        _file: String,
         optimisation_level: u8,
     ) -> Result<(), String> {
         self.declare_gc_functions();
@@ -208,7 +211,7 @@ impl<'ctx> IRGenerator<'ctx> {
         match node {
             TypedNode::Program(nodes) => {
                 let mut exprs = vec![];
-                for node in nodes {
+                for (node, _span, _file) in nodes {
                     match node {
                         TypedNode::Function(name, args, expr, type_) => {
                             self.gen_function(
@@ -340,11 +343,21 @@ impl<'ctx> IRGenerator<'ctx> {
                         _ => unreachable!(),
                     }
                 }
-                exprs.push(TypedExpr::Literal(Literal::Int(0).into(), tconst!("int")));
+                exprs.push(TypedExpr::Literal(
+                    Literal::Int(0).into(),
+                    tconst!("int"),
+                    Span((1, 0), (1, 0)),
+                    self.file.clone(),
+                ));
                 self.gen_function(
                     "main".to_string(),
                     vec![],
-                    &Box::new(TypedExpr::Do(exprs, tconst!("int"))),
+                    &Box::new(TypedExpr::Do(
+                        exprs,
+                        tconst!("int"),
+                        Span((1, 0), (1, 0)),
+                        self.file.clone(),
+                    )),
                     Type::Function(vec![], tconst!("int")).into(),
                 )?;
             }
@@ -487,22 +500,22 @@ impl<'ctx> IRGenerator<'ctx> {
 
 fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
     match expr {
-        TypedExpr::Literal(_, ty) => ty.clone(),
-        TypedExpr::Variable(_, ty) => ty.clone(),
-        TypedExpr::Lambda(_, _, ty) => ty.clone(),
-        TypedExpr::Let(_, _, ty) => ty.clone(),
-        TypedExpr::If(_, _, _, ty) => ty.clone(),
-        TypedExpr::Call(_, _, ty) => ty.clone(),
-        TypedExpr::While(_, _, ty) => ty.clone(),
-        TypedExpr::BinaryOp(_, _, _, ty) => ty.clone(),
-        TypedExpr::UnaryOp(_, _, ty) => ty.clone(),
-        TypedExpr::Array(_, ty) => ty.clone(),
-        TypedExpr::Do(_, ty) => ty.clone(),
-        TypedExpr::Index(_, _, ty) => ty.clone(),
-        TypedExpr::StructAccess(_, _, ty) => ty.clone(),
-        TypedExpr::Return(_, ty) => ty.clone(),
-        TypedExpr::Tuple(_, ty) => ty.clone(),
-        TypedExpr::Assign(_, _, ty) => ty.clone(),
-        TypedExpr::Break | TypedExpr::Continue => t_int!(),
+        TypedExpr::Literal(_, ty, ..) => ty.clone(),
+        TypedExpr::Variable(_, ty, ..) => ty.clone(),
+        TypedExpr::Lambda(_, _, ty, ..) => ty.clone(),
+        TypedExpr::Let(_, _, ty, ..) => ty.clone(),
+        TypedExpr::If(_, _, _, ty, ..) => ty.clone(),
+        TypedExpr::Call(_, _, ty, ..) => ty.clone(),
+        TypedExpr::While(_, _, ty, ..) => ty.clone(),
+        TypedExpr::BinaryOp(_, _, _, ty, ..) => ty.clone(),
+        TypedExpr::UnaryOp(_, _, ty, ..) => ty.clone(),
+        TypedExpr::Array(_, ty, ..) => ty.clone(),
+        TypedExpr::Do(_, ty, ..) => ty.clone(),
+        TypedExpr::Index(_, _, ty, ..) => ty.clone(),
+        TypedExpr::StructAccess(_, _, ty, ..) => ty.clone(),
+        TypedExpr::Return(_, ty, ..) => ty.clone(),
+        TypedExpr::Tuple(_, ty, ..) => ty.clone(),
+        TypedExpr::Assign(_, _, ty, ..) => ty.clone(),
+        TypedExpr::Break(..) | TypedExpr::Continue(..) => t_int!(),
     }
 }

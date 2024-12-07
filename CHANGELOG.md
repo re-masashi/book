@@ -45,3 +45,9 @@ DD/MM/YYYY
 ## 5/12/2024
 	- Re-added return, break and continue.
 	- Arrays added. Indexing works. n-Dimensional arrays work. (thanks a lot void*)
+
+## 6/12/2024
+	- Span based errors in parser
+
+## 7/12/2024
+	- Added span and filename to expressions

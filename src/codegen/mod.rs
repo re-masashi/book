@@ -14,6 +14,10 @@ use std::collections::HashMap;
 use std::iter::zip;
 use std::sync::Arc;
 
+use owo_colors::OwoColorize;
+
+use crate::lexer::tokens::Span;
+
 #[macro_export]
 macro_rules! tvar {
     ($i:expr) => {
@@ -108,47 +112,123 @@ pub enum TypedNode<'a> {
     ),
     Expr(Box<TypedExpr<'a>>, Arc<Type>),
     Error(String),
-    Program(Vec<TypedNode<'a>>),
+    Program(Vec<(TypedNode<'a>, Span, String)>),
     Extern(Cow<'a, str>, Vec<Arc<Type>>, Arc<Type>),
 }
 
 #[derive(Debug, Clone)]
 pub enum TypedExpr<'a> {
-    Let(Cow<'a, str>, Box<TypedExpr<'a>>, Arc<Type>), // name, value
-    Variable(Cow<'a, str>, Arc<Type>),                // name
+    Let(Cow<'a, str>, Box<TypedExpr<'a>>, Arc<Type>, Span, String), // name, value, span
+    Variable(Cow<'a, str>, Arc<Type>, Span, String),                // name, span
     Lambda(
         Vec<(Cow<'a, str>, Arc<Type>)>,
         Box<TypedExpr<'a>>,
         Arc<Type>,
-    ), // args, expression (aka body)
-    Literal(Arc<Literal<'a>>, Arc<Type>),             // literal
+        Span,
+        String,
+    ), // args, expression (aka body), span
+    Literal(Arc<Literal<'a>>, Arc<Type>, Span, String),             // literal, span
     If(
         Box<TypedExpr<'a>>,
         Box<TypedExpr<'a>>,
         Option<Box<TypedExpr<'a>>>,
         Arc<Type>,
-    ), // condition, if_branch, else_branch
-    Call(Box<TypedExpr<'a>>, Vec<TypedExpr<'a>>, Arc<Type>), // value to call, arguments
-    While(Box<TypedExpr<'a>>, Box<TypedExpr<'a>>, Arc<Type>), // condition, body
-    Break,
-    Continue,
+        Span,
+        String,
+    ), // condition, if_branch, else_branch, span
+    Call(
+        Box<TypedExpr<'a>>,
+        Vec<TypedExpr<'a>>,
+        Arc<Type>,
+        Span,
+        String,
+    ), // value to call, arguments, span
+    While(
+        Box<TypedExpr<'a>>,
+        Box<TypedExpr<'a>>,
+        Arc<Type>,
+        Span,
+        String,
+    ), // condition, body, span
+    Break(Span, String),
+    Continue(Span, String),
     BinaryOp(
         Box<TypedExpr<'a>>,
         &'a BinaryOperator,
         Box<TypedExpr<'a>>,
         Arc<Type>,
-    ), // lhs, op, rhs
-    UnaryOp(&'a UnaryOperator, Box<TypedExpr<'a>>, Arc<Type>), // op, val
-    Array(Vec<TypedExpr<'a>>, Arc<Type>),
-    Do(Vec<TypedExpr<'a>>, Arc<Type>),
-    Index(Box<TypedExpr<'a>>, Box<TypedExpr<'a>>, Arc<Type>),
-    StructAccess(Box<TypedExpr<'a>>, Cow<'a, str>, Arc<Type>),
-    Return(Box<TypedExpr<'a>>, Arc<Type>),
-    Tuple(Vec<TypedExpr<'a>>, Arc<Type>),
-    Assign(Box<TypedExpr<'a>>, Box<TypedExpr<'a>>, Arc<Type>), // variable name, expression, type
+        Span,
+        String,
+    ), // lhs, op, rhs, span
+    UnaryOp(
+        &'a UnaryOperator,
+        Box<TypedExpr<'a>>,
+        Arc<Type>,
+        Span,
+        String,
+    ), // op, val, span
+    Array(Vec<TypedExpr<'a>>, Arc<Type>, Span, String),
+    Do(Vec<TypedExpr<'a>>, Arc<Type>, Span, String),
+    Index(
+        Box<TypedExpr<'a>>,
+        Box<TypedExpr<'a>>,
+        Arc<Type>,
+        Span,
+        String,
+    ),
+    StructAccess(Box<TypedExpr<'a>>, Cow<'a, str>, Arc<Type>, Span, String),
+    Return(Box<TypedExpr<'a>>, Arc<Type>, Span, String),
+    Tuple(Vec<TypedExpr<'a>>, Arc<Type>, Span, String),
+    Assign(
+        Box<TypedExpr<'a>>,
+        Box<TypedExpr<'a>>,
+        Arc<Type>,
+        Span,
+        String,
+    ), // variable name, expression, type
 }
 
 pub struct TypeEnv(pub HashMap<String, Arc<Type>>);
+
+impl TypeEnv {
+    pub fn error(&self, err: &TypeError) {
+        let (message, span, file) = match err {
+            TypeError::TypeMismatch {
+                expected,
+                found,
+                span,
+                file,
+            } => (
+                format!(
+                    "Type Mismatch. Expected {}, found {} instead.",
+                    expected.blue(),
+                    found.blue()
+                ),
+                span,
+                file,
+            ),
+            TypeError::OccursCheckFailed { span, file } => {
+                ("Type occurs in itself!".to_string(), span, file)
+            }
+            TypeError::UnhandledType {
+                left,
+                right,
+                span,
+                file,
+            } => (format!("Unhandled type: {left} vs {right}"), span, file),
+        };
+
+        println!(
+            "{} at {:?}: 
+            {} 
+            file `{}`",
+            "[TypeError]".red(),
+            span,
+            message,
+            file.green()
+        );
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum Node<'a> {
@@ -166,30 +246,87 @@ pub enum Node<'a> {
     ),
     Expr(Box<Expr<'a>>),
     Error(String),
-    Program(Vec<Node<'a>>),
+    Program(Vec<(Node<'a>, Span, String)>),
     Extern(Cow<'a, str>, Vec<TypeAnnot>, TypeAnnot),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum Expr<'a> {
-    Let(Cow<'a, str>, Option<TypeAnnot>, Box<Expr<'a>>), // name, value
-    Variable(Cow<'a, str>),                              // name
-    Lambda(Vec<(Cow<'a, str>, Option<TypeAnnot>)>, Box<Expr<'a>>), // args, expression (aka body)
-    Literal(Arc<Literal<'a>>),                           // literal
-    If(Box<Expr<'a>>, Box<Expr<'a>>, Option<Box<Expr<'a>>>), // condition, if_branch, else_branch
-    Call(Box<Expr<'a>>, Vec<Expr<'a>>),                  // value to call, arguments
-    While(Box<Expr<'a>>, Box<Expr<'a>>),                 // condition, body
-    Break,
-    Continue,
-    BinaryOp(Box<Expr<'a>>, BinaryOperator, Box<Expr<'a>>), // lhs, op, rhs
-    UnaryOp(UnaryOperator, Box<Expr<'a>>),                  // op, val
-    Array(Vec<Expr<'a>>),
-    Do(Vec<Expr<'a>>),
-    Index(Box<Expr<'a>>, Box<Expr<'a>>), // value, index
-    StructAccess(Box<Expr<'a>>, Cow<'a, str>),
-    Return(Box<Expr<'a>>),
-    Tuple(Vec<Expr<'a>>),
-    Assign(Box<Expr<'a>>, Box<Expr<'a>>), // variable name, expression
+    Let(Cow<'a, str>, Option<TypeAnnot>, Box<Expr<'a>>, Span, String), // name, value, span
+    Variable(Cow<'a, str>, Span, String),                              // name, span
+    Lambda(
+        Vec<(Cow<'a, str>, Option<TypeAnnot>)>,
+        Box<Expr<'a>>,
+        Span,
+        String,
+    ), // args, expression (aka body), span
+    Literal(Arc<Literal<'a>>, Span, String),                           // literal, span
+    If(
+        Box<Expr<'a>>,
+        Box<Expr<'a>>,
+        Option<Box<Expr<'a>>>,
+        Span,
+        String,
+    ), // condition, if_branch, else_branch, span
+    Call(Box<Expr<'a>>, Vec<Expr<'a>>, Span, String), // value to call, arguments, span
+    While(Box<Expr<'a>>, Box<Expr<'a>>, Span, String), // condition, body, span
+    Break(Span, String),
+    Continue(Span, String),
+    BinaryOp(Box<Expr<'a>>, BinaryOperator, Box<Expr<'a>>, Span, String), // lhs, op, rhs, span
+    UnaryOp(UnaryOperator, Box<Expr<'a>>, Span, String),                  // op, val, span
+    Array(Vec<Expr<'a>>, Span, String),
+    Do(Vec<Expr<'a>>, Span, String),
+    Index(Box<Expr<'a>>, Box<Expr<'a>>, Span, String), // value, index, span
+    StructAccess(Box<Expr<'a>>, Cow<'a, str>, Span, String), // struct, field, span
+    Return(Box<Expr<'a>>, Span, String),
+    Tuple(Vec<Expr<'a>>, Span, String),
+    Assign(Box<Expr<'a>>, Box<Expr<'a>>, Span, String), // variable name, expression, span
+}
+
+impl<'a> PartialEq for Expr<'a> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Expr::Let(name1, ty1, val1, _, _), Expr::Let(name2, ty2, val2, _, _)) => {
+                name1 == name2 && ty1 == ty2 && *val1 == *val2
+            }
+            (Expr::Variable(name1, _, _), Expr::Variable(name2, _, _)) => name1 == name2,
+            (Expr::Lambda(args1, body1, _, _), Expr::Lambda(args2, body2, _, _)) => {
+                args1 == args2 && *body1 == *body2
+            }
+            (Expr::Literal(lit1, _, _), Expr::Literal(lit2, _, _)) => lit1 == lit2,
+            (Expr::If(cond1, if1, else1, _, _), Expr::If(cond2, if2, else2, _, _)) => {
+                cond1 == cond2 && *if1 == *if2 && else1 == else2
+            }
+            (Expr::Call(val1, args1, _, _), Expr::Call(val2, args2, _, _)) => {
+                val1 == val2 && args1 == args2
+            }
+            (Expr::While(cond1, body1, _, _), Expr::While(cond2, body2, _, _)) => {
+                cond1 == cond2 && *body1 == *body2
+            }
+            (Expr::Break(..), Expr::Break(..)) => true,
+            (Expr::Continue(..), Expr::Continue(..)) => true,
+            (Expr::BinaryOp(lhs1, op1, rhs1, _, _), Expr::BinaryOp(lhs2, op2, rhs2, _, _)) => {
+                op1 == op2 && *lhs1 == *lhs2 && *rhs1 == *rhs2
+            }
+            (Expr::UnaryOp(op1, val1, _, _), Expr::UnaryOp(op2, val2, _, _)) => {
+                op1 == op2 && *val1 == *val2
+            }
+            (Expr::Array(vals1, _, _), Expr::Array(vals2, _, _)) => vals1 == vals2,
+            (Expr::Do(vals1, _, _), Expr::Do(vals2, _, _)) => vals1 == vals2,
+            (Expr::Index(val1, idx1, _, _), Expr::Index(val2, idx2, _, _)) => {
+                val1 == val2 && *idx1 == *idx2
+            }
+            (Expr::StructAccess(val1, field1, _, _), Expr::StructAccess(val2, field2, _, _)) => {
+                val1 == val2 && field1 == field2
+            }
+            (Expr::Return(val1, _, _), Expr::Return(val2, _, _)) => *val1 == *val2,
+            (Expr::Tuple(vals1, _, _), Expr::Tuple(vals2, _, _)) => vals1 == vals2,
+            (Expr::Assign(lhs1, val1, _, _), Expr::Assign(lhs2, val2, _, _)) => {
+                *lhs1 == *lhs2 && *val1 == *val2
+            }
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -310,7 +447,33 @@ impl TypeVariable {
     }
 }
 
-fn unify(left: Arc<Type>, right: Arc<Type>, substitutions: &mut HashMap<TypeVariable, Arc<Type>>) {
+#[derive(Debug)]
+pub enum TypeError {
+    TypeMismatch {
+        expected: String,
+        found: String,
+        span: Span,
+        file: String,
+    },
+    OccursCheckFailed {
+        span: Span,
+        file: String,
+    },
+    UnhandledType {
+        left: String,
+        right: String,
+        span: Span,
+        file: String,
+    },
+}
+
+fn unify(
+    left: Arc<Type>,
+    right: Arc<Type>,
+    substitutions: &mut HashMap<TypeVariable, Arc<Type>>,
+    span: &Span,
+    file: &String,
+) -> Result<(), TypeError> {
     match (left.as_ref(), right.as_ref()) {
         (
             Type::Constructor(TypeConstructor {
@@ -324,152 +487,147 @@ fn unify(left: Arc<Type>, right: Arc<Type>, substitutions: &mut HashMap<TypeVari
                 traits: _traits2,
             }),
         ) => {
-            assert_eq!(name1, name2);
-            assert_eq!(generics1.len(), generics2.len());
+            if name1 != name2 {
+                return Err(TypeError::TypeMismatch {
+                    expected: format!("'{}'", name1),
+                    found: format!("'{}'", name2),
+                    span: *span,
+                    file: file.clone(),
+                });
+            }
+            if generics1.len() != generics2.len() {
+                return Err(TypeError::TypeMismatch {
+                    expected: format!("{} generics", generics1.len()),
+                    found: format!("{} generics", generics2.len()),
+                    span: *span,
+                    file: file.clone(),
+                });
+            }
 
             for (left, right) in zip(generics1, generics2) {
-                unify(left.clone(), right.clone(), substitutions);
+                unify(left.clone(), right.clone(), substitutions, span, file)?;
             }
+            Ok(())
         }
         (Type::Variable(v1 @ TypeVariable(..)), Type::Variable(v2 @ TypeVariable(..)))
             if v1 == v2 =>
         {
-            // both are equal
+            Ok(())
         }
         (_, Type::Variable(v @ TypeVariable(..))) => {
             if let Some(substitution) = substitutions.get(v) {
-                unify(left, substitution.clone(), substitutions);
-                return;
+                unify(left, substitution.clone(), substitutions, span, file)?;
+                return Ok(());
             }
 
-            assert!(!v.occurs_in(left.clone(), substitutions));
+            if v.occurs_in(left.clone(), substitutions) {
+                return Err(TypeError::OccursCheckFailed {
+                    span: *span,
+                    file: file.clone(),
+                });
+            }
             substitutions.insert(*v, left);
+            Ok(())
         }
         (Type::Variable(v @ TypeVariable(..)), _) => {
             if let Some(substitution) = substitutions.get(v) {
-                unify(right, substitution.clone(), substitutions);
-                return;
+                unify(right, substitution.clone(), substitutions, span, file)?;
+                return Ok(());
             }
 
-            assert!(!v.occurs_in(right.clone(), substitutions));
+            if v.occurs_in(right.clone(), substitutions) {
+                return Err(TypeError::OccursCheckFailed {
+                    span: *span,
+                    file: file.clone(),
+                });
+            }
             substitutions.insert(*v, right);
+            Ok(())
         }
         (Type::Function(a1, _r1), Type::Function(a2, _r2)) => {
             if a1.len() != a2.len() {
-                panic!("invalid number of args");
+                return Err(TypeError::TypeMismatch {
+                    expected: format!("{} arguments", a1.len()),
+                    found: format!("{} arguments", a2.len()),
+                    span: *span,
+                    file: file.clone(),
+                });
             }
+            Ok(())
         }
         (Type::Struct(name, generics, fields), Type::Struct(name2, generics2, fields2)) => {
-            assert!(name == name2);
-            assert!(generics.len() == generics2.len());
-            assert!(fields.len() == fields2.len());
-            for (i, (_, field)) in fields.iter().enumerate() {
-                unify(field.clone(), fields2[i].1.clone(), substitutions)
+            if name != name2 {
+                return Err(TypeError::TypeMismatch {
+                    expected: format!("struct '{}'", name),
+                    found: format!("struct '{}'", name2),
+                    span: *span,
+                    file: file.clone(),
+                });
             }
+            if generics.len() != generics2.len() {
+                return Err(TypeError::TypeMismatch {
+                    expected: format!("{} generics", generics.len()),
+                    found: format!("{} generics", generics2.len()),
+                    span: *span,
+                    file: file.clone(),
+                });
+            }
+            if fields.len() != fields2.len() {
+                return Err(TypeError::TypeMismatch {
+                    expected: format!("{} fields", fields.len()),
+                    found: format!("{} fields", fields2.len()),
+                    span: *span,
+                    file: file.clone(),
+                });
+            }
+            for (i, (_, field)) in fields.iter().enumerate() {
+                unify(
+                    field.clone(),
+                    fields2[i].1.clone(),
+                    substitutions,
+                    span,
+                    file,
+                )?;
+            }
+            Ok(())
         }
         (Type::Tuple(fields), Type::Tuple(fields2)) => {
-            assert!(fields.len() == fields2.len());
+            if fields.len() != fields2.len() {
+                return Err(TypeError::TypeMismatch {
+                    expected: format!("{} tuple elements", fields.len()),
+                    found: format!("{} tuple elements", fields2.len()),
+                    span: *span,
+                    file: file.clone(),
+                });
+            }
             for (i, field) in fields.iter().enumerate() {
-                unify(field.clone(), fields2[i].clone(), substitutions)
+                unify(field.clone(), fields2[i].clone(), substitutions, span, file)?;
             }
+            Ok(())
         }
-        (_, Type::Struct(..)) | (Type::Struct(..), _) => {
-            panic!("invalid");
-        }
-        (_, Type::Function(_, _)) => {
-            panic!("invalid type");
-        }
-        (Type::Function(_, _), _) => {
-            panic!("invalid type");
-        }
-        _ => todo!(),
+        (_, Type::Struct(..)) | (Type::Struct(..), _) => Err(TypeError::TypeMismatch {
+            expected: "struct".to_string(),
+            found: "non-struct type".to_string(),
+            span: *span,
+            file: file.clone(),
+        }),
+        (_, Type::Function(_, _)) => Err(TypeError::TypeMismatch {
+            expected: "function type".to_string(),
+            found: "non-function type".to_string(),
+            span: *span,
+            file: file.clone(),
+        }),
+        (Type::Function(_, _), _) => Err(TypeError::TypeMismatch {
+            expected: "function type".to_string(),
+            found: "non-function type".to_string(),
+            span: *span,
+            file: file.clone(),
+        }),
+        _ => Err(TypeError::UnhandledType {
+            left: format!("{:?}", left),
+            right: format!("{:?}", right),
+            span: *span,
+            file: file.clone(),
+        }),
     }
-}
-
-pub fn dosumn() {
-    let mut substitutions = HashMap::new();
-
-    unify(
-        tvar!(1),
-        tconst!("Map", tvar!(2), tvar!(3)),
-        &mut substitutions,
-    );
-    unify(tvar!(2), tconst!("str"), &mut substitutions);
-    unify(tvar!(4), tconst!("Map"), &mut substitutions);
-    unify(tvar!(5), tvar!(2), &mut substitutions);
-    unify(
-        tvar!(6),
-        tconst!("Map", tvar!(5), tvar!(3)),
-        &mut substitutions,
-    );
-
-    println!();
-
-    for i in 1..=6 {
-        println!(
-            "{}: {:?}",
-            i,
-            match &(*Type::Variable(TypeVariable(i)).substitute(&substitutions)) {
-                Type::Constructor(c) => c.name.clone(),
-                Type::Variable(_) => format!("T{}", i),
-                Type::Function(_, _) => format!("fn{}", i),
-                Type::Struct(..) => "struct".to_string(),
-                Type::Trait(t) => format!("Trait {t}"),
-                Type::Tuple(..) => "tuple".to_string(),
-            }
-        );
-    }
-}
-
-fn sample_ast() -> Expr<'static> {
-    Expr::Let(
-        std::borrow::Cow::Borrowed("hello"),
-        None,
-        Box::new(Expr::BinaryOp(
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::Literal(Literal::Int(1).into())),
-                BinaryOperator::Add,
-                Box::new(Expr::Literal(Literal::Int(2).into())),
-            )),
-            BinaryOperator::Mul,
-            Box::new(Expr::Literal(Literal::Int(10).into())),
-            // Box::new(
-            //     Expr::BinaryOp(
-            //         Box::new(Expr::Literal(Literal::Int(1).into())),
-            //         BinaryOperator::Add,
-            //         Box::new(Expr::Literal(Literal::Int(2).into())),
-            //     )
-            // ),
-            // BinaryOperator::Equal,
-            // Box::new(Expr::Literal(Literal::Int(3).into())),
-        )),
-    )
-}
-
-pub fn insert_types() {
-    let mut env = TypeEnv(HashMap::new());
-    let ast = sample_ast();
-    let (mut typed_ast, _) = env.expr_to_type(&ast, &mut HashMap::new());
-    crate::codegen::optimise_ast::optimise(&mut typed_ast);
-    let mut cfg = crate::codegen::cfg::ControlFlowGraph::new();
-    // println!("{:#?}", typed_ast);
-    let binding = Expr::If(
-        Box::new(Expr::Literal(Literal::Boolean(true).into())),
-        Box::new(Expr::BinaryOp(
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::Literal(Literal::Int(1).into())),
-                BinaryOperator::Add,
-                Box::new(Expr::Literal(Literal::Int(2).into())),
-            )),
-            BinaryOperator::Mul,
-            Box::new(Expr::Literal(Literal::Int(10).into())),
-        )),
-        Some(Box::new(Expr::Literal(Literal::Int(0).into()))),
-    );
-    cfg.build_from_expr(
-        env.expr_to_type(&binding, &mut HashMap::new()).0,
-        &mut vec![],
-    );
-    // println!("{:?}", typed_ast);
-    // cfg.emit_graphviz("sample.graphviz");
 }

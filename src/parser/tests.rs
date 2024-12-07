@@ -11,7 +11,13 @@ macro_rules! parse {
             span: Span((1, 0), (1, 0)),
             file: "##test##".to_string(),
         }); // HACK: adding a blank expression to the end of the parser. else, the last expression isn't parsed
-        assert_eq!(Parser::new(tokens.into_iter().peekable(), "##test##").parse_expression().unwrap(), $expected)
+        assert_eq!(
+            Parser::new(tokens.into_iter().peekable(), "##test##")
+                .parse_expression()
+                .unwrap()
+                .0,
+            $expected
+        )
     };
     ($source_path: expr) => {
         let lexer = Lexer::from_file($source_path).unwrap();
@@ -55,11 +61,15 @@ fn test_invalid_if() {
 fn test_tuples() {
     parse!(
         "(1,2,3)",
-        Expr::Tuple(vec![
-            Expr::Literal(Literal::Int(1).into()),
-            Expr::Literal(Literal::Int(2).into()),
-            Expr::Literal(Literal::Int(3).into()),
-        ])
+        Expr::Tuple(
+            vec![
+                Expr::Literal(Literal::Int(1).into(), Span((0, 0), (0, 0)), "".to_string()),
+                Expr::Literal(Literal::Int(2).into(), Span((0, 0), (0, 0)), "".to_string()),
+                Expr::Literal(Literal::Int(3).into(), Span((0, 0), (0, 0)), "".to_string()),
+            ],
+            Span((0, 0), (0, 0)),
+            "".to_string()
+        )
     );
 }
 
@@ -70,12 +80,26 @@ fn test_call() {
         Expr::Call(
             Box::new(Expr::Call(
                 Box::new(Expr::Call(
-                    Box::new(Expr::Variable("x".into())),
-                    vec![Expr::Literal(Literal::Int(1).into()),]
+                    Box::new(Expr::Variable(
+                        "x".into(),
+                        Span((0, 0), (0, 0)),
+                        "".to_string()
+                    )),
+                    vec![Expr::Literal(
+                        Literal::Int(1).into(),
+                        Span((0, 0), (0, 0)),
+                        "".to_string()
+                    ),],
+                    Span((0, 0), (0, 0)),
+                    "".to_string()
                 )),
-                vec![]
+                vec![],
+                Span((0, 0), (0, 0)),
+                "".to_string()
             )),
-            vec![]
+            vec![],
+            Span((0, 0), (0, 0)),
+            "".to_string()
         )
     );
 }
@@ -85,8 +109,18 @@ fn test_index() {
     parse!(
         "x[0]",
         Expr::Index(
-            Box::new(Expr::Variable("x".into())),
-            Box::new(Expr::Literal(Literal::Int(0).into()),),
+            Box::new(Expr::Variable(
+                "x".into(),
+                Span((0, 0), (0, 0)),
+                "".to_string()
+            )),
+            Box::new(Expr::Literal(
+                Literal::Int(0).into(),
+                Span((0, 0), (0, 0)),
+                "".to_string()
+            )),
+            Span((0, 0), (0, 0)),
+            "".to_string()
         )
     );
 }
@@ -95,27 +129,54 @@ fn test_index() {
 fn test_array() {
     parse!(
         "[1,2,3,]",
-        Expr::Array(vec![
-            Expr::Literal(Literal::Int(1).into()),
-            Expr::Literal(Literal::Int(2).into()),
-            Expr::Literal(Literal::Int(3).into()),
-        ])
+        Expr::Array(
+            vec![
+                Expr::Literal(Literal::Int(1).into(), Span((0, 0), (0, 0)), "".to_string(),),
+                Expr::Literal(Literal::Int(2).into(), Span((0, 0), (0, 0)), "".to_string(),),
+                Expr::Literal(Literal::Int(3).into(), Span((0, 0), (0, 0)), "".to_string(),),
+            ],
+            Span((0, 0), (0, 0)),
+            "".to_string()
+        )
     );
-    parse!("[]", Expr::Array(vec![]));
+    parse!(
+        "[]",
+        Expr::Array(vec![], Span((0, 0), (0, 0)), "".to_string())
+    );
     parse!(
         "[1,2,3]",
-        Expr::Array(vec![
-            Expr::Literal(Literal::Int(1).into()),
-            Expr::Literal(Literal::Int(2).into()),
-            Expr::Literal(Literal::Int(3).into()),
-        ])
+        Expr::Array(
+            vec![
+                Expr::Literal(Literal::Int(1).into(), Span((0, 0), (0, 0)), "".to_string(),),
+                Expr::Literal(Literal::Int(2).into(), Span((0, 0), (0, 0)), "".to_string(),),
+                Expr::Literal(Literal::Int(3).into(), Span((0, 0), (0, 0)), "".to_string(),),
+            ],
+            Span((0, 0), (0, 0)),
+            "".to_string()
+        )
     );
     parse!(
         "[1,]",
-        Expr::Array(vec![Expr::Literal(Literal::Int(1).into()),])
+        Expr::Array(
+            vec![Expr::Literal(
+                Literal::Int(1).into(),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
+            ),],
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )
     );
     parse!(
         "[21213]",
-        Expr::Array(vec![Expr::Literal(Literal::Int(21213).into()),])
+        Expr::Array(
+            vec![Expr::Literal(
+                Literal::Int(21213).into(),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
+            ),],
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )
     );
 }

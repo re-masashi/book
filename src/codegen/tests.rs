@@ -8,15 +8,40 @@ fn test_typechecker_inference() {
         None,
         Box::new(Expr::BinaryOp(
             Box::new(Expr::BinaryOp(
-                Box::new(Expr::Literal(Literal::Int(1).into())),
+                Box::new(Expr::Literal(
+                    Literal::Int(1).into(),
+                    Span((0, 0), (0, 0)),
+                    "".to_string(),
+                )),
                 BinaryOperator::Add,
-                Box::new(Expr::Literal(Literal::Int(2).into())),
+                Box::new(Expr::Literal(
+                    Literal::Int(2).into(),
+                    Span((0, 0), (0, 0)),
+                    "".to_string(),
+                )),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
             )),
             BinaryOperator::Mul,
-            Box::new(Expr::Variable(std::borrow::Cow::Borrowed("x"))),
+            Box::new(Expr::Variable(
+                std::borrow::Cow::Borrowed("x"),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
+            )),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
         )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
@@ -24,99 +49,252 @@ fn test_typechecker_inference() {
 fn test_typechecker_fail() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::BinaryOp(
-        Box::new(Expr::Literal(Literal::Int(1).into())),
+        Box::new(Expr::Literal(
+            Literal::Int(1).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
         BinaryOperator::Add,
-        Box::new(Expr::Literal(Literal::Boolean(true).into())),
+        Box::new(Expr::Literal(
+            Literal::Boolean(true).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_binop_int_add() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::BinaryOp(
-        Box::new(Expr::Literal(Literal::Int(1).into())),
+        Box::new(Expr::Literal(
+            Literal::Int(1).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
         BinaryOperator::Add,
-        Box::new(Expr::Literal(Literal::Int(31).into())),
+        Box::new(Expr::Literal(
+            Literal::Int(31).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_binop_int_sub() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::BinaryOp(
-        Box::new(Expr::Literal(Literal::Int(121).into())),
+        Box::new(Expr::Literal(
+            Literal::Int(121).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
         BinaryOperator::Sub,
-        Box::new(Expr::Literal(Literal::Int(21).into())),
+        Box::new(Expr::Literal(
+            Literal::Int(21).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_binop_int_mul() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::BinaryOp(
-        Box::new(Expr::Literal(Literal::Int(100).into())),
+        Box::new(Expr::Literal(
+            Literal::Int(100).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
         BinaryOperator::Mul,
-        Box::new(Expr::Literal(Literal::Int(-1).into())),
+        Box::new(Expr::Literal(
+            Literal::Int(-1).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_binop_int_div() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::BinaryOp(
-        Box::new(Expr::Literal(Literal::Int(333).into())),
+        Box::new(Expr::Literal(
+            Literal::Int(333).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
         BinaryOperator::Div,
-        Box::new(Expr::Literal(Literal::Int(37).into())),
+        Box::new(Expr::Literal(
+            Literal::Int(37).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_binop_float_add() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::BinaryOp(
-        Box::new(Expr::Literal(Literal::Float(1.0).into())),
+        Box::new(Expr::Literal(
+            Literal::Float(1.0).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
         BinaryOperator::Add,
-        Box::new(Expr::Literal(Literal::Float(31.0).into())),
+        Box::new(Expr::Literal(
+            Literal::Float(31.0).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_binop_float_sub() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::BinaryOp(
-        Box::new(Expr::Literal(Literal::Float(121.0).into())),
+        Box::new(Expr::Literal(
+            Literal::Float(121.0).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
         BinaryOperator::Sub,
-        Box::new(Expr::Literal(Literal::Float(21.0).into())),
+        Box::new(Expr::Literal(
+            Literal::Float(21.0).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_binop_float_mul() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::BinaryOp(
-        Box::new(Expr::Literal(Literal::Float(100.0).into())),
+        Box::new(Expr::Literal(
+            Literal::Float(100.0).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
         BinaryOperator::Mul,
-        Box::new(Expr::Literal(Literal::Float(-1.0).into())),
+        Box::new(Expr::Literal(
+            Literal::Float(-1.0).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_binop_float_div() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::BinaryOp(
-        Box::new(Expr::Literal(Literal::Float(333.0).into())),
+        Box::new(Expr::Literal(
+            Literal::Float(333.0).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
         BinaryOperator::Div,
-        Box::new(Expr::Literal(Literal::Float(37.0).into())),
+        Box::new(Expr::Literal(
+            Literal::Float(37.0).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
@@ -125,9 +303,22 @@ fn test_typechecker_let() {
     let ast = Expr::Let(
         std::borrow::Cow::Borrowed("myvar"),
         None,
-        Box::new(Expr::Literal(Literal::Int(1).into())),
+        Box::new(Expr::Literal(
+            Literal::Int(1).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
@@ -143,19 +334,49 @@ fn test_typechecker_let_contradicting_types() {
             traits: vec![],
         }),
         Box::new(Expr::BinaryOp(
-            Box::new(Expr::Literal(Literal::Int(1).into())),
+            Box::new(Expr::Literal(
+                Literal::Int(1).into(),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
+            )),
             BinaryOperator::Equal,
-            Box::new(Expr::Literal(Literal::Int(3).into())),
+            Box::new(Expr::Literal(
+                Literal::Int(3).into(),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
+            )),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
         )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_variable() {
     let mut env = TypeEnv(HashMap::new());
-    let ast = Expr::Variable(std::borrow::Cow::Borrowed("myvar"));
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let ast = Expr::Variable(
+        std::borrow::Cow::Borrowed("myvar"),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
+    );
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
@@ -164,40 +385,103 @@ fn test_typechecker_lambda() {
     let ast = Expr::Lambda(
         vec![(std::borrow::Cow::Borrowed("x"), None)],
         Box::new(Expr::BinaryOp(
-            Box::new(Expr::Variable(std::borrow::Cow::Borrowed("x"))),
+            Box::new(Expr::Variable(
+                std::borrow::Cow::Borrowed("x"),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
+            )),
             BinaryOperator::Add,
-            Box::new(Expr::Literal(Literal::Int(3).into())),
+            Box::new(Expr::Literal(
+                Literal::Int(3).into(),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
+            )),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
         )),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_literal_int() {
     let mut env = TypeEnv(HashMap::new());
-    let ast = Expr::Literal(Literal::Int(42).into());
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let ast = Expr::Literal(
+        Literal::Int(42).into(),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
+    );
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_literal_float() {
     let mut env = TypeEnv(HashMap::new());
-    let ast = Expr::Literal(Literal::Float(42.0).into());
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let ast = Expr::Literal(
+        Literal::Float(42.0).into(),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
+    );
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_literal_boolean() {
     let mut env = TypeEnv(HashMap::new());
-    let ast = Expr::Literal(Literal::Boolean(false).into());
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let ast = Expr::Literal(
+        Literal::Boolean(false).into(),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
+    );
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_typechecker_literal_string() {
     let mut env = TypeEnv(HashMap::new());
-    let ast = Expr::Literal(Literal::String("hewwo".to_string().into()).into());
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let ast = Expr::Literal(
+        Literal::String("hewwo".to_string().into()).into(),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
+    );
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
@@ -206,11 +490,20 @@ fn test_typechecker_array() {
     let ast = Expr::Array(
         // Literal::Array(
         vec![
-            Expr::Literal(Literal::Int(0).into()),
-            Expr::Literal(Literal::Int(1).into()),
+            Expr::Literal(Literal::Int(0).into(), Span((0, 0), (0, 0)), "".to_string()),
+            Expr::Literal(Literal::Int(1).into(), Span((0, 0), (0, 0)), "".to_string()),
         ], // ).into()
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
@@ -220,12 +513,25 @@ fn test_typechecker_array_fail() {
     let ast = Expr::Array(
         // Literal::Array(
         vec![
-            Expr::Literal(Literal::Int(0).into()),
-            Expr::Literal(Literal::Int(1).into()),
-            Expr::Literal(Literal::Float(2.).into()),
+            Expr::Literal(Literal::Int(0).into(), Span((0, 0), (0, 0)), "".to_string()),
+            Expr::Literal(Literal::Int(1).into(), Span((0, 0), (0, 0)), "".to_string()),
+            Expr::Literal(
+                Literal::Float(2.).into(),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
+            ),
         ], // ).into()
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 // todo: call, while, unop, array
@@ -234,11 +540,32 @@ fn test_typechecker_array_fail() {
 fn test_typechecker_if() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::If(
-        Box::new(Expr::Literal(Literal::Boolean(false).into())),
-        Box::new(Expr::Literal(Literal::Int(1).into())),
-        Some(Box::new(Expr::Literal(Literal::Int(0).into()))),
+        Box::new(Expr::Literal(
+            Literal::Boolean(false).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Box::new(Expr::Literal(
+            Literal::Int(1).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Some(Box::new(Expr::Literal(
+            Literal::Int(0).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        ))),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
 
 #[test]
@@ -246,11 +573,30 @@ fn test_typechecker_if() {
 fn test_typechecker_if_mismatch() {
     let mut env = TypeEnv(HashMap::new());
     let ast = Expr::If(
-        Box::new(Expr::Literal(Literal::Boolean(false).into())),
-        Box::new(Expr::Literal(Literal::Int(1).into())),
+        Box::new(Expr::Literal(
+            Literal::Boolean(false).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
+        Box::new(Expr::Literal(
+            Literal::Int(1).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )),
         Some(Box::new(Expr::Literal(
             Literal::String(Cow::Borrowed("ewwow")).into(),
+            Span((0, 0), (0, 0)),
+            "".to_string(),
         ))),
+        Span((0, 0), (0, 0)),
+        "".to_string(),
     );
-    let _ = env.expr_to_type(&ast, &mut HashMap::new());
+    let _ = env
+        .expr_to_type(
+            &ast,
+            &Span((0, 0), (0, 0)),
+            &"".to_string(),
+            &mut HashMap::new(),
+        )
+        .unwrap();
 }
