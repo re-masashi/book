@@ -283,7 +283,7 @@ pub enum Expr<'a> {
     Assign(Box<Expr<'a>>, Box<Expr<'a>>, Span, String), // variable name, expression, span
 }
 
-impl<'a> PartialEq for Expr<'a> {
+impl PartialEq for Expr<'_> {
     fn eq(&self, other: &Self) -> bool {
         match (self, other) {
             (Expr::Let(name1, ty1, val1, _, _), Expr::Let(name2, ty2, val2, _, _)) => {
