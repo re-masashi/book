@@ -532,11 +532,15 @@ impl<'a> TypeEnv {
         );
         self.0.insert(
             "str".to_string(),
-            Type::Function(vec![tvar!(self.0.len()+1)], t_str!()).into(),
+            Type::Function(vec![tvar!(self.0.len() + 1)], t_str!()).into(),
         );
         self.0.insert(
             "array".to_string(),
-            Type::Function(vec![t_int!(), tvar!(self.0.len()+1)], tconst!("Array", tvar!(self.0.len()+1))).into(),
+            Type::Function(
+                vec![t_int!(), tvar!(self.0.len() + 1)],
+                tconst!("Array", tvar!(self.0.len() + 1)),
+            )
+            .into(),
         );
         let typed_node = match node {
             Node::Function(name, args, ret, ty) => match ty {
@@ -727,8 +731,9 @@ impl<'a> TypeEnv {
                                 .into()
                             })
                             .collect::<Vec<_>>(),
-                        tconst!(name.to_string())
-                    ).into(),
+                        tconst!(name.to_string()),
+                    )
+                    .into(),
                 );
                 TypedNode::Struct(
                     std::borrow::Cow::Borrowed(name),
@@ -852,8 +857,7 @@ impl<'a> TypeEnv {
         match typed_expr {
             TypedExpr::Literal(lit, ty, span, file) => {
                 let new_ty = Self::substitute_type_vars(ty, substitutions);
-                TypedExpr::Literal(lit, new_ty,
-                    span, file.clone())
+                TypedExpr::Literal(lit, new_ty, span, file.clone())
             }
             TypedExpr::Variable(name, ty, span, file) => {
                 match self.0.get(&name.to_string()) {
@@ -862,7 +866,8 @@ impl<'a> TypeEnv {
                         TypedExpr::Variable(
                             std::borrow::Cow::Owned(name.to_string()),
                             Self::substitute_type_vars(t.clone(), substitutions),
-                            span, file.clone()
+                            span,
+                            file.clone(),
                         )
                     }
                     None => {
@@ -873,7 +878,8 @@ impl<'a> TypeEnv {
                         TypedExpr::Variable(
                             std::borrow::Cow::Owned(name.to_string()),
                             tvar!(self.0.len()),
-                            span, file.clone()
+                            span,
+                            file.clone(),
                         )
                     }
                 }
@@ -904,7 +910,14 @@ impl<'a> TypeEnv {
                 });
                 let new_ty = Self::substitute_type_vars(ty, substitutions);
 
-                TypedExpr::If(new_cond, new_then_branch, new_else_branch, new_ty, span, file)
+                TypedExpr::If(
+                    new_cond,
+                    new_then_branch,
+                    new_else_branch,
+                    new_ty,
+                    span,
+                    file,
+                )
             }
             TypedExpr::Call(func, args, ret_ty, span, file) => {
                 let new_func =
@@ -968,7 +981,7 @@ impl<'a> TypeEnv {
                 Box::new(self.substitute_type_vars_in_typed_expr(*expr, substitutions)),
                 Self::substitute_type_vars(ty, substitutions),
                 span,
-                file
+                file,
             ),
             TypedExpr::Tuple(values, ty, span, file) => {
                 let new_vals = values
@@ -983,7 +996,7 @@ impl<'a> TypeEnv {
                 Box::new(self.substitute_type_vars_in_typed_expr(*expr, substitutions)),
                 Self::substitute_type_vars(ty, substitutions),
                 span,
-                file
+                file,
             ),
             TypedExpr::Break(..) | TypedExpr::Continue(..) => typed_expr,
         }
@@ -1015,7 +1028,13 @@ impl<'a> TypeEnv {
             TypedNode::Program(nodes) => {
                 let new_nodes = nodes
                     .into_iter()
-                    .map(|(n, span, file)| (self.substitute_type_vars_in_typed_node(n, substitutions), span, file))
+                    .map(|(n, span, file)| {
+                        (
+                            self.substitute_type_vars_in_typed_node(n, substitutions),
+                            span,
+                            file,
+                        )
+                    })
                     .collect();
                 TypedNode::Program(new_nodes)
             }
@@ -1023,31 +1042,30 @@ impl<'a> TypeEnv {
             _ => typed_node,
         }
     }
-    pub fn sub_generics(
-        name: &str, 
-        ty: Arc<Type>
-    )->Arc<Type>{
+    pub fn sub_generics(name: &str, ty: Arc<Type>) -> Arc<Type> {
         match ty.as_ref() {
-            Type::Constructor(c)=>{
+            Type::Constructor(c) => {
                 let mut generics = vec![];
                 for generic in &c.generics {
                     generics.push(Self::sub_generics(name, generic.clone()));
-                };
-                if c.name==name {
-                    Type::Constructor(TypeConstructor{
+                }
+                if c.name == name {
+                    Type::Constructor(TypeConstructor {
                         name: name.to_string(),
                         generics,
-                        traits: c.traits.clone()
-                    }).into()
-                }else{
-                    Type::Constructor(TypeConstructor{
+                        traits: c.traits.clone(),
+                    })
+                    .into()
+                } else {
+                    Type::Constructor(TypeConstructor {
                         name: c.name.to_string(),
                         generics,
-                        traits: c.traits.clone()
-                    }).into()
+                        traits: c.traits.clone(),
+                    })
+                    .into()
                 }
             }
-            _=>ty.clone()
+            _ => ty.clone(),
         }
     }
 }

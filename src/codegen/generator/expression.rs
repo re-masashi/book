@@ -3,9 +3,7 @@ use crate::codegen::{Type, TypeConstructor, TypedExpr, UnaryOperator};
 use crate::tconst;
 
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{
-    BasicValue, BasicValueEnum, FunctionValue, InstructionOpcode,
-};
+use inkwell::values::{BasicValue, BasicValueEnum, FunctionValue, InstructionOpcode};
 use inkwell::AddressSpace;
 
 // use std::collections::HashMap;
@@ -236,12 +234,8 @@ impl<'ctx> IRGenerator<'ctx> {
 
                 Ok((IRValue::Simple(phi.as_basic_value()), then_ty))
             }
-            TypedExpr::BinaryOp(..) => {
-                self.gen_binop(expression, function)
-            }
-            TypedExpr::Call(..) => {
-                self.gen_call(expression, function)
-            }
+            TypedExpr::BinaryOp(..) => self.gen_binop(expression, function),
+            TypedExpr::Call(..) => self.gen_call(expression, function),
             TypedExpr::UnaryOp(op, expr, type_, _span, _file) => {
                 let (val, val_type) = self.gen_expression(expr, function)?;
                 let val = val.as_basic_enum(self.context);

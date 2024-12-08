@@ -1,10 +1,8 @@
 use crate::codegen::generator::{get_type_from_typed_expr, IRGenerator, IRType, IRValue};
 use crate::codegen::{BinaryOperator, Type, TypedExpr};
 
-use inkwell::types::{BasicTypeEnum};
-use inkwell::values::{
-    BasicMetadataValueEnum, BasicValue, FunctionValue
-};
+use inkwell::types::BasicTypeEnum;
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, FunctionValue};
 use inkwell::AddressSpace;
 use inkwell::{FloatPredicate, IntPredicate};
 
@@ -509,7 +507,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 };
                 Ok((IRValue::Simple(result), IRType::Simple(lhs_type)))
             }
-            _=>unreachable!()
+            _ => unreachable!(),
         }
     }
 }

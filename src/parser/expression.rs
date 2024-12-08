@@ -112,92 +112,96 @@ impl<'a> Parser<'_> {
             ref x => return Err(format!("expected a valid expression. found `{}`.", x)),
         };
 
-        while let TokenType::LBrack = unwrap_some!(self.tokens.peek()).type_ {
-            // array index
-            self.advance(); // eat '['
-            let index = self.parse_expression();
-            span.1 = self.span.1;
-
-            l_value = Expr::Index(
-                Box::new(l_value),
-                Box::new(index?.0),
-                span,
-                self.file.clone(),
-            );
-            if let TokenType::RBrack = unwrap_some!(self.tokens.peek()).type_ {
-                self.advance(); // eat ']'
-            } else {
-                return Err("unclosed delimiter ']' after array index.".to_string());
-            }
-
-            if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
-                self.advance(); // eat trailing ','
-            }
-
-            span.1 = self.span.1;
-        }
-
-        while let TokenType::LParen = unwrap_some!(self.tokens.peek()).type_ {
-            // call
-            self.advance(); // eat '('
-            let mut args = vec![];
-            span.1 = self.span.1;
-
-            // let index = self.parse_expression();
-            loop {
-                if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
-                    break;
-                }
-                args.push(self.parse_expression()?.0);
-                span.1 = self.span.1;
-
-                if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
-                    self.advance(); // Eat ','
-                    continue;
-                }
-            }
-
-            l_value = Expr::Call(Box::new(l_value), args, span, self.file.clone());
-
-            if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
-                self.advance(); // eat trailing ','
-            }
-
-            if let TokenType::RParen = unwrap_some!(self.tokens.peek()).type_ {
-                self.advance(); // eat ')'
-            }
-
-            span.1 = self.span.1;
-        }
-
-        while let TokenType::Dot = unwrap_some!(self.tokens.peek()).type_ {
-            self.advance(); // eat '.'
-
-            let field = match self.advance().type_ {
-                TokenType::Identifier(i) => i,
-                x => {
-                    return Err(format!(
-                        "expected identifier after '.' for struct field access. found {}",
-                        x
-                    ))
-                }
-            };
-            l_value = Expr::StructAccess(Box::new(l_value), field.into(), span, self.file.clone())
-        }
-
-        while let TokenType::Assign = unwrap_some!(self.tokens.peek()).type_ {
-            match l_value {
-                Expr::Variable(..) | Expr::StructAccess(..) | Expr::Index(..) => {
-                    self.advance(); // eat '='
+        loop {
+            // postfix operators
+            match unwrap_some!(self.tokens.peek()).type_ {
+                TokenType::LBrack => {
+                    self.advance(); // eat '['
+                    let index = self.parse_expression();
                     span.1 = self.span.1;
-                    l_value = Expr::Assign(
+
+                    l_value = Expr::Index(
                         Box::new(l_value),
-                        Box::new(self.parse_expression()?.0),
+                        Box::new(index?.0),
                         span,
                         self.file.clone(),
                     );
+                    if let TokenType::RBrack = unwrap_some!(self.tokens.peek()).type_ {
+                        self.advance(); // eat ']'
+                    } else {
+                        return Err("unclosed delimiter ']' after array index.".to_string());
+                    }
+
+                    if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
+                        self.advance(); // eat trailing ','
+                    }
+
+                    span.1 = self.span.1;
                 }
-                _ => return Err("invalid expression on LHS of assignment.".to_string()),
+                TokenType::LParen => {
+                    // call
+                    self.advance(); // eat '('
+                    let mut args = vec![];
+                    span.1 = self.span.1;
+
+                    loop {
+                        if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                            break;
+                        }
+                        args.push(self.parse_expression()?.0);
+                        span.1 = self.span.1;
+
+                        if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                            self.advance(); // Eat ','
+                            continue;
+                        }
+                    }
+
+                    l_value = Expr::Call(Box::new(l_value), args, span, self.file.clone());
+
+                    if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
+                        self.advance(); // eat trailing ','
+                    }
+
+                    if let TokenType::RParen = unwrap_some!(self.tokens.peek()).type_ {
+                        self.advance(); // eat ')'
+                    }
+
+                    span.1 = self.span.1;
+                }
+                TokenType::Dot => {
+                    self.advance(); // eat '.'
+
+                    let field = match self.advance().type_ {
+                        TokenType::Identifier(i) => i,
+                        x => {
+                            return Err(format!(
+                                "expected identifier after '.' for struct field access. found {}",
+                                x
+                            ))
+                        }
+                    };
+                    l_value =
+                        Expr::StructAccess(Box::new(l_value), field.into(), span, self.file.clone())
+                }
+                TokenType::Assign => {
+                    match l_value {
+                        Expr::Variable(..) | Expr::StructAccess(..) | Expr::Index(..) => {
+                            self.advance(); // eat '='
+                            span.1 = self.span.1;
+                            l_value = Expr::Assign(
+                                Box::new(l_value),
+                                Box::new(self.parse_expression()?.0),
+                                span,
+                                self.file.clone(),
+                            );
+                        }
+                        _ => return Err("invalid expression on LHS of assignment.".to_string()),
+                    }
+                }
+                _ => {
+                    break;
+                }
             }
         }
 

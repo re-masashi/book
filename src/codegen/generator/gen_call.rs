@@ -1,14 +1,12 @@
 use crate::codegen::generator::{get_type_from_typed_expr, IRGenerator, IRType, IRValue};
-use crate::codegen::{Literal, Type, TypeConstructor, TypedExpr, TypedNode, TypeEnv};
+use crate::codegen::{Literal, Type, TypeConstructor, TypeEnv, TypedExpr, TypedNode};
 use crate::tconst;
-use inkwell::values::{
-    BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue,
-};
-use inkwell::AddressSpace;
 use inkwell::types::BasicType;
+use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
+use inkwell::AddressSpace;
 
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 impl<'ctx> IRGenerator<'ctx> {
     pub fn gen_call(
@@ -78,7 +76,10 @@ impl<'ctx> IRGenerator<'ctx> {
                                     };
                                 }
                                 if args.len() != 1 {
-                                    return Err(format!("Invalid number of args. expected 1. found {}", args.len()));
+                                    return Err(format!(
+                                        "Invalid number of args. expected 1. found {}",
+                                        args.len()
+                                    ));
                                 }
                                 let arg = &args[0];
                                 // println!("{:#?}", arg);
@@ -219,7 +220,10 @@ impl<'ctx> IRGenerator<'ctx> {
                                 }
                                 if args.len() != 1 {
                                     // println!("{:#?}", args);
-                                    return Err(format!("Invalid number of args. expected 1. found {}", args.len()));
+                                    return Err(format!(
+                                        "Invalid number of args. expected 1. found {}",
+                                        args.len()
+                                    ));
                                 }
                                 let arg = &args[0];
                                 // println!("{:#?}", arg);
@@ -439,31 +443,58 @@ impl<'ctx> IRGenerator<'ctx> {
                             }
                             "array" => {
                                 if args.len() != 2 {
-                                    return Err("Invalid number of args provided to `array`.".to_string());
+                                    return Err(
+                                        "Invalid number of args provided to `array`.".to_string()
+                                    );
                                 }
                                 if let Type::Constructor(TypeConstructor {
                                     name,
                                     generics: _,
                                     traits: _,
-                                }) = get_type_from_typed_expr(&args[0]).as_ref() {
-                                    if *name != "int".to_string(){
-                                        return Err(format!("Invalid length provided to `array`. Found {:?}", &args[0]))
+                                }) = get_type_from_typed_expr(&args[0]).as_ref()
+                                {
+                                    if name != "int" {
+                                        return Err(format!(
+                                            "Invalid length provided to `array`. Found {:?}",
+                                            &args[0]
+                                        ));
                                     }
-                                }else {
-                                    return Err(format!("Invalid length provided to `array`. Found {:?}", &args[0]))
+                                } else {
+                                    return Err(format!(
+                                        "Invalid length provided to `array`. Found {:?}",
+                                        &args[0]
+                                    ));
                                 }
-                                let (compiled_len, _len_ty) = self.gen_expression(&args[0], function)?;
-                                let (_compiled_val, val_ty) = self.gen_expression(&args[1], function)?;
-                                
+                                let (compiled_len, _len_ty) =
+                                    self.gen_expression(&args[0], function)?;
+                                let (_compiled_val, val_ty) =
+                                    self.gen_expression(&args[1], function)?;
+
                                 // Get the size of the value type (in bits)
-                                let type_size_in_bits = val_ty.as_basic_enum(self.context).size_of().expect("Failed to get size of type");
+                                let type_size_in_bits = val_ty
+                                    .as_basic_enum(self.context)
+                                    .size_of()
+                                    .expect("Failed to get size of type");
                                 let malloc_func = self
                                     .module
                                     .get_function("GC_malloc")
                                     .expect("malloc not found");
 
-                                let array_size = self.builder.build_int_mul(compiled_len.as_basic_enum(self.context).into_int_value(), type_size_in_bits.into(), "array_size").unwrap();
-                                let array_ptr = self.builder.build_call(malloc_func, &[array_size.into()], "array_alloc").unwrap().try_as_basic_value().left().unwrap();
+                                let array_size = self
+                                    .builder
+                                    .build_int_mul(
+                                        compiled_len.as_basic_enum(self.context).into_int_value(),
+                                        type_size_in_bits,
+                                        "array_size",
+                                    )
+                                    .unwrap();
+                                let array_ptr = self
+                                    .builder
+                                    .build_call(malloc_func, &[array_size.into()], "array_alloc")
+                                    .unwrap()
+                                    .try_as_basic_value()
+                                    .left()
+                                    .unwrap();
 
                                 // // Populate the array at runtime
                                 // let zero = self.context.i32_type().const_int(0, false); // Loop index
@@ -476,16 +507,16 @@ impl<'ctx> IRGenerator<'ctx> {
                                 // self.builder.position_at_end(loop_block);
 
                                 // let loop_index = self.builder.build_alloca(
-                                //     self.context.i32_type(), 
+                                //     self.context.i32_type(),
                                 //     "loop_index"
                                 // ).unwrap();
                                 // self.builder.build_store(loop_index, zero).unwrap();
 
                                 // let element_ptr = unsafe{
                                 //     self.builder.build_gep(
-                                //         val_ty.as_basic_enum(self.context), 
-                                //         array_ptr.into_pointer_value(), 
-                                //         &[loop_index.as_basic_value_enum().into_int_value()], 
+                                //         val_ty.as_basic_enum(self.context),
+                                //         array_ptr.into_pointer_value(),
+                                //         &[loop_index.as_basic_value_enum().into_int_value()],
                                 //         "array_element"
                                 //     )
                                 // };
@@ -502,7 +533,12 @@ impl<'ctx> IRGenerator<'ctx> {
 
                                 // self.builder.position_at_end(exit_block);
 
-                                Ok((IRValue::Simple(array_ptr), IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into())))
+                                Ok((
+                                    IRValue::Simple(array_ptr),
+                                    IRType::Simple(
+                                        self.context.ptr_type(AddressSpace::from(0)).into(),
+                                    ),
+                                ))
                             }
                             _ => unreachable!(),
                         }
@@ -635,7 +671,7 @@ impl<'ctx> IRGenerator<'ctx> {
                     _ => panic!("invalid call!"),
                 }
             }
-            _=>unreachable!()
+            _ => unreachable!(),
         }
     }
 }

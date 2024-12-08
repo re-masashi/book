@@ -23,9 +23,9 @@ use crate::lexer::tokens::Span;
 use crate::{t_float, t_int, t_str, tconst};
 
 pub mod expression;
-pub mod gen_call;
-pub mod gen_binop;
 pub mod function;
+pub mod gen_binop;
+pub mod gen_call;
 
 pub struct IRGenerator<'ctx> {
     context: &'ctx Context,
@@ -235,7 +235,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         TypedNode::Extern(name, args, ret) => {
                             self.gen_extern(name.to_string(), args.to_vec(), ret.clone())?;
                         }
-                        TypedNode::Struct(name, generics, fields) => {
+                        TypedNode::Struct(name, _generics, fields) => {
                             let mut arg_types = vec![];
                             let mut field_types = vec![];
                             let mut field_metadata_types = vec![];

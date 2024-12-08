@@ -9,6 +9,10 @@ struct Response
 	close int
 end
 
+struct Vec<T>
+	val Array<T>
+end
+
 def count_to_1M(n: int) -> int
 	if n < 1_000_000 then
 		count_to_1M(n+1)
