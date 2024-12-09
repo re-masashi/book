@@ -152,7 +152,12 @@ impl<'ctx> IRGenerator<'ctx> {
                 IRType::Returned(_) => {
                     // no-op
                 }
-                _ => todo!(),
+                IRType::Struct(_t, _) => {
+                    self.builder
+                        .build_return(Some(&returned_val.as_basic_enum(self.context)))
+                        .unwrap();
+                }
+                ref x => todo!("{:?}", x),
             }
 
             // Verify the function

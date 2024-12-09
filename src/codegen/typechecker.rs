@@ -24,8 +24,36 @@ impl<'a> TypeEnv {
                             .collect(),
                         traits: vec![],
                     });
-                    let (expr_typed, type_) =
+                    let (expr_typed, mut type_) =
                         self.expr_to_type(value, span, file, substitutions)?;
+
+                    if self.1.contains_key(&ty.name) {
+                        trace!("struct `{}` found", ty.name);
+                        if let Type::Constructor(TypeConstructor {
+                            name,
+                            generics: _,
+                            traits: _,
+                        }) = type_.as_ref()
+                        {
+                            if *name == ty.name {
+                                type_ = Type::Constructor(TypeConstructor {
+                                    name: ty.name.to_string(),
+                                    generics: ty
+                                        .generics
+                                        .clone()
+                                        .into_iter()
+                                        .map(|generic| {
+                                            trace!("{name}{:?}", generic);
+                                            tconst!(generic)
+                                        })
+                                        .collect(),
+                                    traits: vec![],
+                                })
+                                .into();
+                            }
+                        }
+                    }
+
                     unify(
                         annoted_type.into(),
                         type_.clone(),
@@ -439,16 +467,42 @@ impl<'a> TypeEnv {
                     ty,
                 ));
             }
-            Expr::StructAccess(struct_, field, span, file) => (
-                TypedExpr::StructAccess(
-                    Box::new(self.expr_to_type(struct_, span, file, substitutions)?.0),
-                    std::borrow::Cow::Borrowed(field),
-                    tvar!(self.0.len()),
-                    *span,
-                    file.clone(),
-                ),
-                tvar!(self.0.len()),
-            ),
+            Expr::StructAccess(struct_, field, span, file) => {
+                let (expr, expr_type) = self.expr_to_type(struct_, span, file, substitutions)?;
+                let mut typ = tvar!(self.0.len() + 1);
+                if let Type::Constructor(TypeConstructor {
+                    name,
+                    generics: _,
+                    traits: _,
+                }) = expr_type.as_ref()
+                {
+                    if self.1.contains_key(name) {
+                        let Some((_name, _generics, fields)) = self.1.get(name) else {
+                            unreachable!()
+                        };
+                        let mut has_key = false;
+                        for (name, ty) in fields.iter() {
+                            if name == field {
+                                has_key = true;
+                                typ = ty.clone();
+                            }
+                        }
+                        if !has_key {
+                            panic!("no such field found in the given struct")
+                        }
+                    }
+                }
+                (
+                    TypedExpr::StructAccess(
+                        Box::new(expr),
+                        std::borrow::Cow::Borrowed(field),
+                        typ.clone(),
+                        *span,
+                        file.clone(),
+                    ),
+                    typ.clone(),
+                )
+            }
             Expr::Return(expr, span, file) => {
                 let (val, ty) = self.expr_to_type(expr, span, file, substitutions)?;
                 (
@@ -724,16 +778,73 @@ impl<'a> TypeEnv {
                                         .generics
                                         .clone()
                                         .into_iter()
-                                        .map(|generic| tconst!(generic))
+                                        .map(|generic| {
+                                            if generics
+                                                .contains(&std::borrow::Cow::Borrowed(&generic))
+                                            {
+                                                tvar!(self.0.len() + 1)
+                                            } else {
+                                                tconst!(generic)
+                                            }
+                                        })
                                         .collect(),
                                     traits: vec![],
                                 })
                                 .into()
                             })
                             .collect::<Vec<_>>(),
-                        tconst!(name.to_string()),
+                        Type::Constructor(TypeConstructor {
+                            name: name.to_string(),
+                            generics: generics
+                                .clone()
+                                .into_iter()
+                                .map(|generic| {
+                                    if generics.contains(&std::borrow::Cow::Borrowed(&generic)) {
+                                        tvar!(self.0.len() + 1)
+                                    } else {
+                                        tconst!(generic)
+                                    }
+                                })
+                                .collect(),
+                            traits: vec![],
+                        })
+                        .into(),
                     )
                     .into(),
+                );
+                self.1.insert(
+                    name.to_string(),
+                    (
+                        name.to_string(),
+                        generics.iter().map(|n| n.to_string()).collect(),
+                        fields
+                            .iter()
+                            .map(|(name, ty)| {
+                                (
+                                    name.to_string(),
+                                    Type::Constructor(TypeConstructor {
+                                        name: ty.name.to_string(),
+                                        generics: ty
+                                            .generics
+                                            .clone()
+                                            .into_iter()
+                                            .map(|generic| {
+                                                if generics
+                                                    .contains(&std::borrow::Cow::Borrowed(&generic))
+                                                {
+                                                    tvar!(self.0.len() + 1)
+                                                } else {
+                                                    tconst!(generic)
+                                                }
+                                            })
+                                            .collect(),
+                                        traits: vec![],
+                                    })
+                                    .into(),
+                                )
+                            })
+                            .collect::<Vec<(_, Arc<Type>)>>(),
+                    ),
                 );
                 TypedNode::Struct(
                     std::borrow::Cow::Borrowed(name),
@@ -749,7 +860,15 @@ impl<'a> TypeEnv {
                                         .generics
                                         .clone()
                                         .into_iter()
-                                        .map(|generic| tconst!(generic))
+                                        .map(|generic| {
+                                            if generics
+                                                .contains(&std::borrow::Cow::Borrowed(&generic))
+                                            {
+                                                tvar!(self.0.len() + 1)
+                                            } else {
+                                                tconst!(generic)
+                                            }
+                                        })
                                         .collect(),
                                     traits: vec![],
                                 })

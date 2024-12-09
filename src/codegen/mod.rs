@@ -188,7 +188,9 @@ pub enum TypedExpr<'a> {
     ), // variable name, expression, type
 }
 
-pub struct TypeEnv(pub HashMap<String, Arc<Type>>);
+type Struct = (String, Vec<String>, Vec<(String, Arc<Type>)>);
+
+pub struct TypeEnv(pub HashMap<String, Arc<Type>>, pub HashMap<String, Struct>);
 
 impl TypeEnv {
     pub fn error(&self, err: &TypeError) {

@@ -4,6 +4,7 @@ use crate::tconst;
 use inkwell::types::BasicType;
 use inkwell::values::{BasicMetadataValueEnum, BasicValue, BasicValueEnum, FunctionValue};
 use inkwell::AddressSpace;
+use inkwell::IntPredicate;
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -310,9 +311,8 @@ impl<'ctx> IRGenerator<'ctx> {
                                         }
                                     }
                                     IRType::BuiltIn => todo!(),
-                                    IRType::Struct(name, ..) => Ok(self.gen_literal(
-                                        &Literal::String(format!("<{}>", name).into()),
-                                    )),
+                                    IRType::Struct(v, ..) => Ok(self
+                                        .gen_literal(&Literal::String(format!("<{}>", v).into()))),
                                     IRType::Function(..)
                                     | IRType::PolyMorph
                                     | IRType::Returned(..) => todo!(),
@@ -339,7 +339,9 @@ impl<'ctx> IRGenerator<'ctx> {
                             "str" => {
                                 let ret = tconst!("str");
                                 if args.len() != 1 {
-                                    return Err("Invalid number of args.".to_string());
+                                    return Err(
+                                        "Invalid number of args provided to `str`.".to_string()
+                                    );
                                 }
                                 let arg = &args[0];
                                 let (compiled_arg, ty) = self.gen_expression(arg, function)?;
@@ -496,45 +498,157 @@ impl<'ctx> IRGenerator<'ctx> {
                                     .left()
                                     .unwrap();
 
-                                // // Populate the array at runtime
-                                // let zero = self.context.i32_type().const_int(0, false); // Loop index
-                                // let end = compiled_len.as_basic_enum(self.context).into_int_value(); // Loop limit
-                                // let loop_block = self.context.append_basic_block(function, "loop_block");
-                                // let exit_block = self.context.append_basic_block(function, "exit_block");
-
-                                // self.builder.build_unconditional_branch(loop_block).unwrap();
-
-                                // self.builder.position_at_end(loop_block);
-
-                                // let loop_index = self.builder.build_alloca(
-                                //     self.context.i32_type(),
-                                //     "loop_index"
-                                // ).unwrap();
-                                // self.builder.build_store(loop_index, zero).unwrap();
-
-                                // let element_ptr = unsafe{
-                                //     self.builder.build_gep(
-                                //         val_ty.as_basic_enum(self.context),
-                                //         array_ptr.into_pointer_value(),
-                                //         &[loop_index.as_basic_value_enum().into_int_value()],
-                                //         "array_element"
-                                //     )
-                                // };
-                                // self.builder.build_store(element_ptr.unwrap(), compiled_val.as_basic_enum(self.context)).unwrap();
-
-                                // let next_index = self.builder.build_int_add(loop_index.as_basic_value_enum().into_int_value(), self.context.i32_type().const_int(1, false), "next_index").unwrap();
-                                // self.builder.build_store(loop_index, next_index).unwrap();
-
-                                // self.builder.build_conditional_branch(
-                                //     self.builder.build_int_compare(inkwell::IntPredicate::ULT, next_index, end, "check_end").unwrap(),
-                                //     loop_block,
-                                //     exit_block,
-                                // ).unwrap();
-
-                                // self.builder.position_at_end(exit_block);
-
                                 Ok((
                                     IRValue::Simple(array_ptr),
+                                    IRType::Simple(
+                                        self.context.ptr_type(AddressSpace::from(0)).into(),
+                                    ),
+                                ))
+                            }
+                            "push" => {
+                                if args.len() != 4 {
+                                    return Err(
+                                        "Invalid number of args provided to `push`.".to_string()
+                                    );
+                                }
+                                if let Type::Constructor(TypeConstructor {
+                                    name,
+                                    generics: _,
+                                    traits: _,
+                                }) = get_type_from_typed_expr(&args[0]).as_ref()
+                                {
+                                    if name != "Array" {
+                                        return Err(format!(
+                                            "Invalid array provided to `push`. Found {:?}",
+                                            &args[0]
+                                        ));
+                                    }
+                                } else {
+                                    return Err(format!(
+                                        "Invalid array provided to `push`. Found {:?}",
+                                        &args[0]
+                                    ));
+                                }
+                                if let Type::Constructor(TypeConstructor {
+                                    name,
+                                    generics: _,
+                                    traits: _,
+                                }) = get_type_from_typed_expr(&args[1]).as_ref()
+                                {
+                                    if name != "int" {
+                                        return Err(format!(
+                                            "Invalid length provided to `push`. Found {:?}",
+                                            &args[1]
+                                        ));
+                                    }
+                                } else {
+                                    return Err(format!(
+                                        "Invalid length provided to `push`. Found {:?}",
+                                        &args[1]
+                                    ));
+                                }
+                                if let Type::Constructor(TypeConstructor {
+                                    name,
+                                    generics: _,
+                                    traits: _,
+                                }) = get_type_from_typed_expr(&args[2]).as_ref()
+                                {
+                                    if name != "int" {
+                                        return Err(format!(
+                                            "Invalid capacity provided to `push`. Found {:?}",
+                                            &args[2]
+                                        ));
+                                    }
+                                } else {
+                                    return Err(format!(
+                                        "Invalid capacity provided to `push`. Found {:?}",
+                                        &args[2]
+                                    ));
+                                }
+                                let (compiled_arr, _arr_ty) =
+                                    self.gen_expression(&args[0], function)?;
+                                let (compiled_len, _len_ty) =
+                                    self.gen_expression(&args[1], function)?;
+                                let (compiled_capacity, _capacity_ty) =
+                                    self.gen_expression(&args[2], function)?;
+                                let (compiled_val, val_ty) =
+                                    self.gen_expression(&args[3], function)?;
+
+                                // Get the size of the value type (in bits)
+                                let type_size_in_bits = val_ty
+                                    .as_basic_enum(self.context)
+                                    .size_of()
+                                    .expect("Failed to get size of type");
+
+                                let realloc_func = self
+                                    .module
+                                    .get_function("GC_realloc")
+                                    .expect("realloc not found");
+
+                                // Get the current array's length and capacity
+                                let current_len = compiled_len.as_basic_enum(self.context);
+                                let current_capacity =
+                                    compiled_capacity.as_basic_enum(self.context);
+
+                                // Check if we need to reallocate (if length > capacity)
+                                let _length_exceeds_capacity = self.builder.build_int_compare(
+                                    IntPredicate::SGT,
+                                    current_len.into_int_value(),
+                                    current_capacity.into_int_value(),
+                                    "len_gt_cap",
+                                );
+                                let array_size = self
+                                    .builder
+                                    .build_int_mul(
+                                        current_capacity.into_int_value(),
+                                        type_size_in_bits,
+                                        "new_capacity",
+                                    )
+                                    .unwrap();
+
+                                let new_arr = self
+                                    .builder
+                                    .build_call(
+                                        realloc_func,
+                                        &[
+                                            compiled_arr.as_basic_enum(self.context).into(),
+                                            array_size.into(),
+                                        ],
+                                        "new_arr",
+                                    )
+                                    .unwrap()
+                                    .try_as_basic_value()
+                                    .left()
+                                    .unwrap();
+
+                                let _new_len = self
+                                    .builder
+                                    .build_int_add(
+                                        current_len.into_int_value(),
+                                        self.context.i32_type().const_int(1, false),
+                                        "inc_len",
+                                    )
+                                    .unwrap();
+
+                                // Store the new value at the correct index in the array (assuming we know the base address)
+                                self.builder
+                                    .build_store(
+                                        unsafe {
+                                            self.builder
+                                                .build_gep(
+                                                    val_ty.as_basic_enum(self.context),
+                                                    new_arr.into_pointer_value(),
+                                                    &[current_len.into_int_value()],
+                                                    "newval",
+                                                )
+                                                .unwrap()
+                                        },
+                                        compiled_val.as_basic_enum(self.context),
+                                    )
+                                    .unwrap();
+
+                                Ok((
+                                    IRValue::Simple(new_arr),
                                     IRType::Simple(
                                         self.context.ptr_type(AddressSpace::from(0)).into(),
                                     ),
@@ -548,10 +662,10 @@ impl<'ctx> IRGenerator<'ctx> {
                         let arg_exprs = args;
                         let continuation_bb = function.get_last_basic_block().unwrap();
 
-                        let mut typeenv = TypeEnv(HashMap::new());
+                        let mut typeenv = TypeEnv(HashMap::new(), HashMap::new());
 
                         if args.len() != polyargs.len() {
-                            return Err("Invalid number of args".to_string());
+                            return Err(format!("Invalid number of args provided to {name}"));
                         }
                         let mut substitutions = HashMap::new();
 

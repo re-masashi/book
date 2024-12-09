@@ -2,7 +2,7 @@ use crate::codegen::*;
 
 #[test]
 fn test_typechecker_inference() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Let(
         std::borrow::Cow::Borrowed("hello"),
         None,
@@ -47,7 +47,7 @@ fn test_typechecker_inference() {
 #[test]
 #[should_panic]
 fn test_typechecker_fail() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::BinaryOp(
         Box::new(Expr::Literal(
             Literal::Int(1).into(),
@@ -75,7 +75,7 @@ fn test_typechecker_fail() {
 
 #[test]
 fn test_typechecker_binop_int_add() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::BinaryOp(
         Box::new(Expr::Literal(
             Literal::Int(1).into(),
@@ -103,7 +103,7 @@ fn test_typechecker_binop_int_add() {
 
 #[test]
 fn test_typechecker_binop_int_sub() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::BinaryOp(
         Box::new(Expr::Literal(
             Literal::Int(121).into(),
@@ -131,7 +131,7 @@ fn test_typechecker_binop_int_sub() {
 
 #[test]
 fn test_typechecker_binop_int_mul() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::BinaryOp(
         Box::new(Expr::Literal(
             Literal::Int(100).into(),
@@ -159,7 +159,7 @@ fn test_typechecker_binop_int_mul() {
 
 #[test]
 fn test_typechecker_binop_int_div() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::BinaryOp(
         Box::new(Expr::Literal(
             Literal::Int(333).into(),
@@ -187,7 +187,7 @@ fn test_typechecker_binop_int_div() {
 
 #[test]
 fn test_typechecker_binop_float_add() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::BinaryOp(
         Box::new(Expr::Literal(
             Literal::Float(1.0).into(),
@@ -215,7 +215,7 @@ fn test_typechecker_binop_float_add() {
 
 #[test]
 fn test_typechecker_binop_float_sub() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::BinaryOp(
         Box::new(Expr::Literal(
             Literal::Float(121.0).into(),
@@ -243,7 +243,7 @@ fn test_typechecker_binop_float_sub() {
 
 #[test]
 fn test_typechecker_binop_float_mul() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::BinaryOp(
         Box::new(Expr::Literal(
             Literal::Float(100.0).into(),
@@ -271,7 +271,7 @@ fn test_typechecker_binop_float_mul() {
 
 #[test]
 fn test_typechecker_binop_float_div() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::BinaryOp(
         Box::new(Expr::Literal(
             Literal::Float(333.0).into(),
@@ -299,7 +299,7 @@ fn test_typechecker_binop_float_div() {
 
 #[test]
 fn test_typechecker_let() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Let(
         std::borrow::Cow::Borrowed("myvar"),
         None,
@@ -325,7 +325,7 @@ fn test_typechecker_let() {
 #[should_panic]
 fn test_typechecker_let_contradicting_types() {
     // contradicting types
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Let(
         std::borrow::Cow::Borrowed("myvar"),
         Some(TypeAnnot {
@@ -363,7 +363,7 @@ fn test_typechecker_let_contradicting_types() {
 
 #[test]
 fn test_typechecker_variable() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Variable(
         std::borrow::Cow::Borrowed("myvar"),
         Span((0, 0), (0, 0)),
@@ -381,7 +381,7 @@ fn test_typechecker_variable() {
 
 #[test]
 fn test_typechecker_lambda() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Lambda(
         vec![(std::borrow::Cow::Borrowed("x"), None)],
         Box::new(Expr::BinaryOp(
@@ -414,7 +414,7 @@ fn test_typechecker_lambda() {
 
 #[test]
 fn test_typechecker_literal_int() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Literal(
         Literal::Int(42).into(),
         Span((0, 0), (0, 0)),
@@ -432,7 +432,7 @@ fn test_typechecker_literal_int() {
 
 #[test]
 fn test_typechecker_literal_float() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Literal(
         Literal::Float(42.0).into(),
         Span((0, 0), (0, 0)),
@@ -450,7 +450,7 @@ fn test_typechecker_literal_float() {
 
 #[test]
 fn test_typechecker_literal_boolean() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Literal(
         Literal::Boolean(false).into(),
         Span((0, 0), (0, 0)),
@@ -468,7 +468,7 @@ fn test_typechecker_literal_boolean() {
 
 #[test]
 fn test_typechecker_literal_string() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Literal(
         Literal::String("hewwo".to_string().into()).into(),
         Span((0, 0), (0, 0)),
@@ -486,7 +486,7 @@ fn test_typechecker_literal_string() {
 
 #[test]
 fn test_typechecker_array() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Array(
         // Literal::Array(
         vec![
@@ -509,7 +509,7 @@ fn test_typechecker_array() {
 #[test]
 #[should_panic]
 fn test_typechecker_array_fail() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::Array(
         // Literal::Array(
         vec![
@@ -538,7 +538,7 @@ fn test_typechecker_array_fail() {
 
 #[test]
 fn test_typechecker_if() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::If(
         Box::new(Expr::Literal(
             Literal::Boolean(false).into(),
@@ -571,7 +571,7 @@ fn test_typechecker_if() {
 #[test]
 #[should_panic]
 fn test_typechecker_if_mismatch() {
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let ast = Expr::If(
         Box::new(Expr::Literal(
             Literal::Boolean(false).into(),

@@ -2,7 +2,6 @@ use "examples/example_struct.bk"
 use "examples/math.bk"
 
 extern run_socket_server(int, int, ptr,) -> int
-extern strcmp(str, str,) -> int
 
 struct Response
 	resp str
@@ -11,11 +10,16 @@ end
 
 struct Vec<T>
 	val Array<T>
+	len int
+	capacity int
 end
 
-def count_to_1M(n: int) -> int
-	if n < 1_000_000 then
-		count_to_1M(n+1)
+def newvec(val)
+	Vec(array(16, val), 16, 32)
+
+def count_to_1B(n: int) -> int
+	if n < 1_000_000_000 then
+		count_to_1B(n+1)
 
 def handler(req: str) -> Response do
 	print("OK\n")
@@ -32,9 +36,12 @@ end
 
 # return 0 ## return on top level to exit the program. shall i add it?
 
-println(type("abcd"))
-println(type(11))
+# println(type("abcd"))
+# println(type(11))
 
-let list: Array<str> = array(4, "")
-list[0] = "hello cro"
-println(list[0])
+# let list: Array<str> = array(4, "")
+# list[0] = "hello cro"
+# println(list[0])
+
+# let x: Vec<int> = newvec(1)
+count_to_1B(1)

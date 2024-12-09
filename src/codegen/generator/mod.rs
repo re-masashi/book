@@ -49,7 +49,7 @@ pub struct PolyMorphicFunction<'ctx>(
     IRType<'ctx>,
 );
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum IRType<'ctx> {
     Function(Vec<(String, IRType<'ctx>)>, Box<IRType<'ctx>>),
     Struct(StructType<'ctx>, Vec<(String, IRType<'ctx>)>),
@@ -161,11 +161,21 @@ impl<'ctx> IRGenerator<'ctx> {
             .fn_type(&[self.context.i64_type().into()], false);
         let _malloc_func = self.module.add_function("GC_malloc", malloc_type, None);
 
+        // Declare the GC_realloc function
+        let realloc_type = self.context.ptr_type(AddressSpace::from(0)).fn_type(
+            &[
+                self.context.ptr_type(AddressSpace::from(0)).into(),
+                self.context.i64_type().into(),
+            ],
+            false,
+        ); // maybe not needed?
+        let _realloc_func = self.module.add_function("GC_realloc", realloc_type, None);
+
         // Declare the GC_free function
-        let free_type = self
-            .context
-            .void_type()
-            .fn_type(&[self.context.i8_type().into()], false); // maybe not needed?
+        let free_type = self.context.void_type().fn_type(
+            &[self.context.ptr_type(AddressSpace::from(0)).into()],
+            false,
+        ); // maybe not needed?
         let _free_func = self.module.add_function("GC_free", free_type, None);
     }
 
@@ -196,6 +206,10 @@ impl<'ctx> IRGenerator<'ctx> {
         self.variables.insert(
             "array".to_string(),
             (IRValue::BuiltIn("array".to_string()), IRType::BuiltIn),
+        );
+        self.variables.insert(
+            "push".to_string(),
+            (IRValue::BuiltIn("push".to_string()), IRType::BuiltIn),
         );
 
         self.gen_extern("printint".to_string(), vec![t_int!()], t_int!())?;

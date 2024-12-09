@@ -60,7 +60,7 @@ fn build_file(
     }); // HACK: adding a blank expression to the end of the parser. else, the last expression isn't parsed
     let mut parser = Parser::new(tokens.into_iter().peekable(), source_path);
 
-    let mut env = TypeEnv(HashMap::new());
+    let mut env = TypeEnv(HashMap::new(), HashMap::new());
     let mut substitutions = HashMap::new();
 
     trace!("Parsing started");

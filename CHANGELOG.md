@@ -51,3 +51,11 @@ DD/MM/YYYY
 
 ## 7/12/2024
 	- Added span and filename to expressions
+
+## 8/12/2024
+	- type checkcer improvements
+	- alloc an array with empty fields using `array`
+
+## 9/12/2024
+	- added dynamic arrays!
+	- added a `push`
