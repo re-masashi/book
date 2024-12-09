@@ -5,3 +5,4 @@
 - [ ] Solidify the typechecker
 - [ ] Concurrency
 - [ ] Standard Library
+- [x] Dynamic Arrays
