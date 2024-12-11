@@ -6,7 +6,15 @@ end
 struct Person
 	age int
 	name str
+	hobby Hobby
+end
+
+def display(person: Person) do
+	let person: Person = person # weak typechecker moment
+	println(person.name+" is "+str(person.age)+" years old.")
+	println(person.name+" spent "+str(person.hobby.time_spent)+" hours on "+ person.hobby.name)
 end
 
 # use the constructor created along with the struct
-let x: Person = Person(17, "masashi")
+let person: Person = Person(17, "masashi", Hobby("music", 0))
+display(person)

@@ -33,7 +33,7 @@ pub struct IRGenerator<'ctx> {
     builder: Builder<'ctx>,
     lambda_counter: i32,
     variables: HashMap<String, (IRValue<'ctx>, IRType<'ctx>)>,
-    structs: HashMap<String, StructType<'ctx>>,
+    structs: HashMap<String, (StructType<'ctx>, Vec<(String, IRType<'ctx>)>)>,
     pos: i32,
     line_no: i32,
     file: String,
@@ -213,7 +213,7 @@ impl<'ctx> IRGenerator<'ctx> {
         );
 
         self.gen_extern("printint".to_string(), vec![t_int!()], t_int!())?;
-        self.gen_extern("printstr".to_string(), vec![t_str!()], t_str!())?;
+        self.gen_extern("printstr".to_string(), vec![t_str!()], t_int!())?;
         self.gen_extern("printstrln".to_string(), vec![t_str!()], t_int!())?;
 
         self.gen_extern("int_to_str".to_string(), vec![t_int!()], t_str!())?;
@@ -322,7 +322,18 @@ impl<'ctx> IRGenerator<'ctx> {
 
                             self.builder.build_return(Some(&struct_ptr)).unwrap();
 
-                            self.structs.insert(name.to_string(), struct_type);
+                            self.structs.insert(
+                                name.to_string(),
+                                (
+                                    struct_type,
+                                    fields
+                                        .iter()
+                                        .map(|(name, ty)| {
+                                            (name.to_string(), self.type_to_llvm(ty.clone()))
+                                        })
+                                        .collect(),
+                                ),
+                            );
                             self.variables.insert(
                                 name.to_string(),
                                 (
@@ -507,13 +518,17 @@ impl<'ctx> IRGenerator<'ctx> {
                 "str" => IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into()),
                 "Array" => IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into()),
                 x => match self.structs.get(x) {
-                    Some(_v) => IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into()),
+                    Some((ref s, ref f)) => IRType::Struct(*s, f.to_vec()),
                     None => panic!("no such struct `{x}`"),
                 },
             },
-            Type::Struct(_name, _generics, _fields) => {
+            Type::Struct(name, _generics, _fields) => {
                 // println!("{:?}", generics);
-                IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into())
+                match self.structs.get(name) {
+                    Some((ref s, ref f)) => IRType::Struct(*s, f.to_vec()),
+                    None => panic!("no such struct `{name}`"),
+                }
+                // IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into())
             }
             _ => panic!("{:?}", ty),
         }

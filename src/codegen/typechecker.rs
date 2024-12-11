@@ -647,10 +647,12 @@ impl<'a> TypeEnv {
                             .collect(),
                         traits: vec![],
                     });
+                    // println!("{:?}", args);
                     let type_ = Type::Function(
                         args.iter()
                             .map(|(arg, argtype)| match argtype {
                                 Some(ty) => {
+                                    // println!("{arg}: {:?}", argtype);
                                     let type_: Arc<Type> = Type::Constructor(TypeConstructor {
                                         name: ty.name.to_string(),
                                         generics: ty
@@ -708,14 +710,103 @@ impl<'a> TypeEnv {
                     retval
                 }
                 None => {
+                    trace!("{:?}", ty);
+                    let mut is_poly = false;
+                    for (_, argtype) in args {
+                        match argtype {
+                            Some(_) => {}
+                            None => {
+                                is_poly = true;
+                                break;
+                            }
+                        }
+                    }
+                    if is_poly {
+                        let type_ = Type::Function(
+                            args.iter()
+                                .map(|(arg, _argtype)| {
+                                    let type_: Arc<Type> = tvar!(self.0.len() + 1);
+                                    self.0.insert(arg.to_string(), type_.clone());
+                                    type_
+                                })
+                                .collect(),
+                            tvar!(self.0.len() + 1),
+                        );
+                        self.0.insert(name.to_string(), type_.clone().into());
+                        let (ret, _ret_type) = self.expr_to_type(ret, span, file, substitutions)?;
+                        // unify(tvar!(self.0.len()+1), ret_type, substitutions);
+                        return Ok(TypedNode::Function(
+                            std::borrow::Cow::Borrowed(name),
+                            args.iter()
+                                .map(|(arg, _argtype)| {
+                                    let type_: Arc<Type> = tvar!(self.0.len() + 1);
+                                    self.0.insert(arg.to_string(), type_.clone());
+                                    (arg.clone(), type_)
+                                })
+                                .collect(),
+                            Box::new(ret),
+                            type_.clone().into(),
+                        ));
+                    }
                     // let ret_type = tvar!(self.0.len() + 1);
                     let (expr, expr_type) = self.expr_to_type(ret, span, file, substitutions)?;
-                    // unify(expr_type.clone(), ret_type, substitutions);
+                    let typed_args: Vec<_> = args
+                        .iter()
+                        .map(|(arg, argtype)| match argtype {
+                            Some(ty) => {
+                                // println!("{arg}: {:?}", argtype);
+                                let mut type_: Arc<Type> = Type::Constructor(TypeConstructor {
+                                    name: ty.name.to_string(),
+                                    generics: ty
+                                        .generics
+                                        .clone()
+                                        .into_iter()
+                                        .map(|generic| tconst!(generic))
+                                        .collect(),
+                                    traits: vec![],
+                                })
+                                .into();
 
-                    let type_ = Type::Function(
-                        args.iter().map(|_arg| tvar!(self.0.len() + 1)).collect(),
-                        expr_type.clone(),
-                    );
+                                if self.1.contains_key(&ty.name) {
+                                    trace!("struct `{}` in arg found", ty.name);
+                                    if let Type::Constructor(TypeConstructor {
+                                        name,
+                                        generics: _,
+                                        traits: _,
+                                    }) = type_.as_ref()
+                                    {
+                                        type_ = Type::Constructor(TypeConstructor {
+                                            name: ty.name.to_string(),
+                                            generics: ty
+                                                .generics
+                                                .clone()
+                                                .into_iter()
+                                                .map(|generic| {
+                                                    trace!("{name}{:?}", generic);
+                                                    tconst!(generic)
+                                                })
+                                                .collect(),
+                                            traits: vec![],
+                                        })
+                                        .into();
+                                    }
+                                }
+                                self.0.insert(arg.to_string(), type_.clone());
+                                type_.clone()
+                            }
+                            None => {
+                                let var = tvar!(self.0.len() + 1);
+                                self.0.insert(arg.to_string(), var.clone());
+                                var
+                            }
+                        })
+                        .collect();
+                    // unify(expr_type.clone(), ret_type, substitutions);
+                    // println!("{:?}", args);
+                    // println!("{:?}", self.0.get(&args[0].0.to_string()));
+
+                    let type_ = Type::Function(typed_args, expr_type.clone());
+                    // println!("{:?}", type_);
                     self.0.insert(name.to_string(), type_.clone().into());
                     TypedNode::Function(
                         std::borrow::Cow::Borrowed(name),
@@ -1095,7 +1186,40 @@ impl<'a> TypeEnv {
 
                 TypedExpr::Index(new_arr, new_idx, new_ty, span, file)
             }
-            TypedExpr::StructAccess(..) => typed_expr,
+            TypedExpr::StructAccess(ref expr, ref field, ref type_, ref span, ref file) => {
+                let new_expr =
+                    self.substitute_type_vars_in_typed_expr(*expr.clone(), substitutions);
+                let mut typ = type_.clone();
+                if let Type::Constructor(TypeConstructor {
+                    name,
+                    generics: _,
+                    traits: _,
+                }) = get_type_from_typed_expr(expr).as_ref()
+                {
+                    if self.1.contains_key(name) {
+                        let Some((_name, _generics, fields)) = self.1.get(name) else {
+                            unreachable!()
+                        };
+                        let mut has_key = false;
+                        for (name, ty) in fields.iter() {
+                            if name == field {
+                                has_key = true;
+                                typ = ty.clone();
+                            }
+                        }
+                        if !has_key {
+                            panic!("no such field found in the given struct")
+                        }
+                    }
+                }
+                TypedExpr::StructAccess(
+                    Box::new(new_expr),
+                    field.clone(),
+                    typ.clone(),
+                    *span,
+                    file.to_string(),
+                )
+            }
             TypedExpr::Return(expr, ty, span, file) => TypedExpr::Return(
                 Box::new(self.substitute_type_vars_in_typed_expr(*expr, substitutions)),
                 Self::substitute_type_vars(ty, substitutions),

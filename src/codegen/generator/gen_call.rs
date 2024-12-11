@@ -419,6 +419,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                                 &Literal::String("<function>".to_string().into()),
                                             )),
                                             Type::Variable(_v) => {
+                                                // println!("{:#?}", expression);
                                                 todo!()
                                             }
                                             Type::Trait(_) => todo!(),
