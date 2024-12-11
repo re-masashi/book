@@ -60,6 +60,21 @@ macro_rules! t_int {
 }
 
 #[macro_export]
+macro_rules! t_long {
+    () => {
+        Arc::new(Type::Constructor(TypeConstructor {
+            name: "long".to_string(),
+            generics: vec![],
+            traits: vec![
+                "Number".to_string(),
+                "Printable".to_string(),
+                "Simple".to_string(),
+            ],
+        }))
+    };
+}
+
+#[macro_export]
 macro_rules! t_float {
     () => {
         Arc::new(Type::Constructor(TypeConstructor {

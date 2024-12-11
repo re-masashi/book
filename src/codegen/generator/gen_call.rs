@@ -581,6 +581,15 @@ impl<'ctx> IRGenerator<'ctx> {
                                     .size_of()
                                     .expect("Failed to get size of type");
 
+                                let type_size_in_bits = self
+                                    .builder
+                                    .build_int_cast(
+                                        type_size_in_bits,
+                                        self.context.i32_type(),
+                                        "type_size_i32",
+                                    )
+                                    .unwrap();
+
                                 let realloc_func = self
                                     .module
                                     .get_function("GC_realloc")
@@ -591,29 +600,98 @@ impl<'ctx> IRGenerator<'ctx> {
                                 let current_capacity =
                                     compiled_capacity.as_basic_enum(self.context);
 
-                                // Check if we need to reallocate (if length > capacity)
-                                let _length_exceeds_capacity = self.builder.build_int_compare(
-                                    IntPredicate::SGT,
-                                    current_len.into_int_value(),
-                                    current_capacity.into_int_value(),
-                                    "len_gt_cap",
-                                );
-                                let array_size = self
+                                let len_equals_capacity = self
+                                    .builder
+                                    .build_int_compare(
+                                        IntPredicate::EQ,
+                                        current_len.into_int_value(),
+                                        current_capacity.into_int_value(),
+                                        "len_eq_cap",
+                                    )
+                                    .unwrap();
+
+                                let push_block = self.context.append_basic_block(function, "push");
+                                let grow_block = self.context.append_basic_block(function, "grow");
+                                let end_block = self.context.append_basic_block(function, "end");
+
+                                self.builder
+                                    .build_conditional_branch(
+                                        len_equals_capacity,
+                                        grow_block,
+                                        push_block,
+                                    )
+                                    .unwrap();
+
+                                self.builder.position_at_end(grow_block);
+
+                                // Double the capacity
+                                let new_capacity = self
                                     .builder
                                     .build_int_mul(
                                         current_capacity.into_int_value(),
-                                        type_size_in_bits,
+                                        self.context.i32_type().const_int(2, false),
                                         "new_capacity",
                                     )
                                     .unwrap();
 
-                                let new_arr = self
+                                let array_size = self
+                                    .builder
+                                    .build_int_mul(
+                                        new_capacity, //.into_int_value(),
+                                        type_size_in_bits,
+                                        "new_capacity",
+                                    )
+                                    .unwrap();
+                                let array_size = self
+                                    .builder
+                                    .build_int_z_extend(
+                                        array_size,
+                                        self.context.i64_type(),
+                                        "array_size_i64",
+                                    )
+                                    .unwrap();
+
+                                let grown_arr = self
                                     .builder
                                     .build_call(
                                         realloc_func,
                                         &[
                                             compiled_arr.as_basic_enum(self.context).into(),
                                             array_size.into(),
+                                        ],
+                                        "grown_arr",
+                                    )
+                                    .unwrap()
+                                    .try_as_basic_value()
+                                    .left()
+                                    .unwrap();
+
+                                self.builder.build_unconditional_branch(end_block).unwrap();
+                                self.builder.position_at_end(push_block);
+
+                                let array_size_push = self
+                                    .builder
+                                    .build_int_mul(
+                                        current_capacity.into_int_value(), // Use current capacity in push block
+                                        type_size_in_bits,
+                                        "array_size_push",
+                                    )
+                                    .unwrap();
+                                let array_size_push = self
+                                    .builder
+                                    .build_int_z_extend(
+                                        array_size_push,
+                                        self.context.i64_type(),
+                                        "array_size_push_i64",
+                                    )
+                                    .unwrap();
+                                let new_arr = self
+                                    .builder
+                                    .build_call(
+                                        realloc_func,
+                                        &[
+                                            compiled_arr.as_basic_enum(self.context).into(),
+                                            array_size_push.into(),
                                         ],
                                         "new_arr",
                                     )
@@ -622,16 +700,15 @@ impl<'ctx> IRGenerator<'ctx> {
                                     .left()
                                     .unwrap();
 
-                                let _new_len = self
-                                    .builder
-                                    .build_int_add(
-                                        current_len.into_int_value(),
-                                        self.context.i32_type().const_int(1, false),
-                                        "inc_len",
-                                    )
-                                    .unwrap();
+                                // let new_len = self
+                                //     .builder
+                                //     .build_int_add(
+                                //         current_len.into_int_value(),
+                                //         self.context.i32_type().const_int(1, false),
+                                //         "inc_len",
+                                //     )
+                                //     .unwrap();
 
-                                // Store the new value at the correct index in the array (assuming we know the base address)
                                 self.builder
                                     .build_store(
                                         unsafe {
@@ -648,8 +725,41 @@ impl<'ctx> IRGenerator<'ctx> {
                                     )
                                     .unwrap();
 
+                                self.builder.build_unconditional_branch(end_block).unwrap();
+
+                                self.builder.position_at_end(end_block);
+
+                                let phi = self
+                                    .builder
+                                    .build_phi(
+                                        self.context.ptr_type(AddressSpace::from(0)),
+                                        "result_array",
+                                    )
+                                    .unwrap();
+
+                                phi.add_incoming(&[
+                                    (&grown_arr, grow_block),
+                                    (&new_arr, push_block),
+                                ]);
+
+                                // // Store the new value at the correct index in the array (assuming we know the base address)
+                                // self.builder
+                                //     .build_store(
+                                //         unsafe {
+                                //             self.builder
+                                //                 .build_gep(
+                                //                     val_ty.as_basic_enum(self.context),
+                                //                     new_arr.into_pointer_value(),
+                                //                     &[current_len.into_int_value()],
+                                //                     "newval",
+                                //                 )
+                                //                 .unwrap()
+                                //         },
+                                //         compiled_val.as_basic_enum(self.context),
+                                //     )
+                                //     .unwrap();
                                 Ok((
-                                    IRValue::Simple(new_arr),
+                                    IRValue::Simple(phi.as_basic_value()),
                                     IRType::Simple(
                                         self.context.ptr_type(AddressSpace::from(0)).into(),
                                     ),

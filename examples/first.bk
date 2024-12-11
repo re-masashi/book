@@ -2,7 +2,6 @@ use "examples/example_struct.bk"
 use "examples/math.bk"
 
 extern run_socket_server(int, int, ptr,) -> int
-
 struct Response
 	resp str
 	close int
@@ -43,5 +42,4 @@ end
 # list[0] = "hello cro"
 # println(list[0])
 
-# let x: Vec<int> = newvec(1)
-count_to_1B(1)
+# count_to_1B(1)
