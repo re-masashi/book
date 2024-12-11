@@ -59,3 +59,9 @@ DD/MM/YYYY
 ## 9/12/2024
 	- added dynamic arrays!
 	- added a `push`
+
+## 10/12/2024
+	- attempted adding methods
+
+## 11/12/2024
+	- fixed an issue where a ptr was passed instead of a struct in function args
