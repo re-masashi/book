@@ -577,7 +577,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
                                 let arr_ptr_type = self.context.ptr_type(AddressSpace::from(0));
                                 let arr_ptr = compiled_arr
-                                    .as_basic_enum(&self.context)
+                                    .as_basic_enum(self.context)
                                     .into_pointer_value();
 
                                 // Get the size of the value type (in bits)
@@ -615,7 +615,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                     )
                                     .unwrap();
 
-                                let array_size = self
+                                let _array_size = self
                                     .builder
                                     .build_int_mul(
                                         current_capacity.into_int_value(),
@@ -672,14 +672,8 @@ impl<'ctx> IRGenerator<'ctx> {
                                     .unwrap_or_else(|| {
                                         let fn_type = self.context.void_type().fn_type(
                                             &[
-                                                self.context
-                                                    .i8_type()
-                                                    .ptr_type(AddressSpace::from(0))
-                                                    .into(),
-                                                self.context
-                                                    .i8_type()
-                                                    .ptr_type(AddressSpace::from(0))
-                                                    .into(),
+                                                self.context.ptr_type(AddressSpace::from(0)).into(),
+                                                self.context.ptr_type(AddressSpace::from(0)).into(),
                                                 self.context.i64_type().into(),
                                                 // self.context.i32_type().into(),
                                                 self.context.bool_type().into(),
@@ -732,10 +726,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                         .unwrap()
                                 };
                                 self.builder
-                                    .build_store(
-                                        dest_ptr,
-                                        compiled_val.as_basic_enum(&self.context),
-                                    )
+                                    .build_store(dest_ptr, compiled_val.as_basic_enum(self.context))
                                     .unwrap();
 
                                 self.builder
@@ -747,10 +738,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
                                 // push block stuff
                                 self.builder
-                                    .build_store(
-                                        dest_ptr,
-                                        compiled_val.as_basic_enum(&self.context),
-                                    )
+                                    .build_store(dest_ptr, compiled_val.as_basic_enum(self.context))
                                     .unwrap();
                                 self.builder.build_unconditional_branch(end_block).unwrap();
                                 self.builder.position_at_end(end_block);
