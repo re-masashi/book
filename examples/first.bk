@@ -1,5 +1,5 @@
-use "examples/example_struct.bk"
-use "examples/math.bk"
+#use "examples/example_struct.bk"
+#use "examples/math.bk"
 
 extern run_socket_server(int, int, ptr,) -> int
 struct Response
@@ -38,8 +38,12 @@ end
 # println(type("abcd"))
 # println(type(11))
 
-# let list: Array<str> = array(4, "")
-# list[0] = "hello cro"
-# println(list[0])
+# let list: Array<int> = array(4, 0)
+# list[0] = 21
+# list[1] = 21
+# list[2] = 21
+# list[3] = 21
+# push(list, 4, 4, 200)
+# push(list, 5, 8, 200)
 
 # count_to_1B(1)

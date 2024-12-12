@@ -228,6 +228,29 @@ impl<'ctx> IRGenerator<'ctx> {
             t_str!(),
         )?;
 
+        let default_triple = TargetMachine::get_default_triple();
+
+        Target::initialize_x86(&InitializationConfig::default());
+
+        let opt = match optimisation_level {
+            0 => OptimizationLevel::None,
+            1 => OptimizationLevel::Less,
+            2 => OptimizationLevel::Default,
+            _ => OptimizationLevel::Aggressive,
+        };
+        let reloc = RelocMode::PIC;
+        let model = CodeModel::Default;
+        let binding = self.file.clone() + ".o";
+        let path = Path::new(&binding);
+        let target = Target::from_name("x86-64").unwrap();
+        let target_machine = target
+            .create_target_machine(&default_triple, "x86-64", "+avx2", opt, reloc, model)
+            .unwrap();
+
+        // let data_layout = target_machine.get_target_data();
+        let data_layout = target_machine.get_target_data().get_data_layout();
+        self.module.set_data_layout(&data_layout);
+
         match node {
             TypedNode::Program(nodes) => {
                 let mut exprs = vec![];
@@ -395,25 +418,6 @@ impl<'ctx> IRGenerator<'ctx> {
             }
             _ => unreachable!(),
         };
-
-        let default_triple = TargetMachine::get_default_triple();
-
-        Target::initialize_x86(&InitializationConfig::default());
-
-        let opt = match optimisation_level {
-            0 => OptimizationLevel::None,
-            1 => OptimizationLevel::Less,
-            2 => OptimizationLevel::Default,
-            _ => OptimizationLevel::Aggressive,
-        };
-        let reloc = RelocMode::PIC;
-        let model = CodeModel::Default;
-        let binding = self.file.clone() + ".o";
-        let path = Path::new(&binding);
-        let target = Target::from_name("x86-64").unwrap();
-        let target_machine = target
-            .create_target_machine(&default_triple, "x86-64", "+avx2", opt, reloc, model)
-            .unwrap();
 
         match self.module.verify() {
             Ok(_) => {}

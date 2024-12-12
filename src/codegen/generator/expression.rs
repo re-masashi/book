@@ -299,7 +299,12 @@ impl<'ctx> IRGenerator<'ctx> {
 
                     let inner_ptr = unsafe {
                         self.builder
-                            .build_gep(array_type, ptr, &[const_0, const_i], &format!("elem_{}", i))
+                            .build_in_bounds_gep(
+                                array_type,
+                                ptr,
+                                &[const_0, const_i],
+                                &format!("elem_{}", i),
+                            )
                             .unwrap()
                     };
 
@@ -548,15 +553,10 @@ impl<'ctx> IRGenerator<'ctx> {
                         self.builder
                             .build_store(index_ptr, val.as_basic_enum(self.context))
                             .unwrap();
-                        let field_val = self
-                            .builder
-                            .build_load(
-                                self.type_to_llvm(type_.clone()).as_basic_enum(self.context),
-                                index_ptr,
-                                "index_val",
-                            )
-                            .unwrap();
-                        Ok((IRValue::Simple(field_val), self.type_to_llvm(type_.clone())))
+                        Ok((
+                            IRValue::Simple(index_value.into()),
+                            self.type_to_llvm(type_.clone()),
+                        ))
                     }
                     TypedExpr::StructAccess(structref, field, _, _span, _file) => {
                         let (structref, structty) = self.gen_expression(&structref, function)?;

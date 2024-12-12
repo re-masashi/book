@@ -17,4 +17,4 @@ end
 
 # use the constructor created along with the struct
 let person: Person = Person(17, "masashi", Hobby("music", 0))
-# display(person)
+display(person)

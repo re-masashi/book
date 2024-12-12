@@ -596,6 +596,20 @@ impl<'a> TypeEnv {
             )
             .into(),
         );
+        self.0.insert(
+            "push".to_string(),
+            Type::Function(
+                vec![
+                    tconst!("Array", tvar!(self.0.len() + 1)),
+                    t_int!(),
+                    t_int!(),
+                    tvar!(self.0.len() + 1),
+                ],
+                tvar!(self.0.len() + 1),
+            )
+            .into(),
+        );
+
         let typed_node = match node {
             Node::Function(name, args, ret, ty) => match ty {
                 Some(ty) => {
