@@ -10,7 +10,7 @@ struct Person
 end
 
 def display(person: Person) do
-	let person: Person = person # weak typechecker moment
+	let person: Person = person # structs need explicit annotation for now here
 	println(person.name+" is "+str(person.age)+" years old.")
 	println(person.name+" spent "+str(person.hobby.time_spent)+" hours on "+ person.hobby.name)
 end
