@@ -7,9 +7,11 @@ let items = [
 println(items[1][1])
 
 let list: Array<str> = array(2, "")
+
 list[0] = "hello cro0"
 list[1] = "hello cro1"
 list[2] = "hello cro2"
+
 println(list[2])
 push(list, 1, 10, "a string")
 println(list[2])
