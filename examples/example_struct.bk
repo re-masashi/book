@@ -12,9 +12,9 @@ end
 def display(person: Person) do
 	let person: Person = person # structs need explicit annotation for now here
 	println(person.name+" is "+str(person.age)+" years old.")
-	println(person.name+" spent "+str(person.hobby.time_spent)+" hours on "+ person.hobby.name)
+	println(person.name+" spent "+str(person.hobby.time_spent)+" hours "+ person.hobby.name)
 end
 
 # use the constructor created along with the struct
-let person: Person = Person(17, "masashi", Hobby("music", 0))
+let person: Person = Person(17, "masashi", Hobby("cycling", 10))
 display(person)
