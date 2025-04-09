@@ -10,7 +10,7 @@ use std::collections::HashMap;
 pub enum Node<'a> {
     Start,
     End,
-    BasicBlock(Vec<TypedExpr<'a>>), //' Modified to use Basic Blocks
+    BasicBlock(Vec<TypedExpr<'a>>), // Modified to use Basic Blocks
     Condition(TypedExpr<'a>),
 }
 

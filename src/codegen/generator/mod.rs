@@ -177,6 +177,13 @@ impl<'ctx> IRGenerator<'ctx> {
             false,
         ); // maybe not needed?
         let _free_func = self.module.add_function("GC_free", free_type, None);
+        
+        // Declare the exit function
+        let exit_type = self.context.void_type().fn_type(
+            &[self.context.i32_type().into()],
+            false,
+        ); // maybe not needed?
+        let _exit_func = self.module.add_function("exit", exit_type, None);
     }
 
     pub fn gen_program(
@@ -463,7 +470,7 @@ impl<'ctx> IRGenerator<'ctx> {
         // println!("{:#?}\n====", node);
         Command::new("gcc") // todo: make this better
             .args([
-                "-O2",
+                "-O3",
                 &(binding),
                 "std.cc",
                 "-o",

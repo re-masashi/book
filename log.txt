@@ -1,0 +1,1226 @@
+### File Contents of: src/parser/ ###
+-------------------------------------
+
+
+=== FILE: function.rs ===
+-------------------------------------
+#![allow(clippy::needless_lifetimes)]
+// clippy goes nuts for no reason at all over false positives.
+// see https://github.com/rust-lang/rust-clippy/issues/740
+// and https://github.com/rust-lang/rust-clippy/issues/13749 maybe
+
+use crate::codegen::{Node, TypeAnnot};
+use crate::lexer::tokens::{Span, TokenType};
+use crate::parser::Parser;
+use crate::{unwrap_some, Result};
+
+impl<'a> Parser<'_> {
+    pub fn parse_type(&mut self) -> Result<TypeAnnot> {
+        let type_name = match self.advance().type_ {
+            TokenType::Identifier(ref i) => i.to_string(),
+            TokenType::LParen => {
+                let mut vals = vec![];
+                loop {
+                    if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                        self.advance(); // eat ')'
+                        break;
+                    }
+                    vals.push(self.parse_type()?);
+                    if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                        self.advance(); // eat ')'
+                        break;
+                    }
+                    if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                        self.advance(); // eat ','
+                    } else {
+                        return Err(format!(
+                            "expected ',' or `)` in tuple type definition found {} instead",
+                            self.advance().type_
+                        ));
+                    }
+                }
+                println!("{:?}", vals);
+                todo!()
+            }
+            x => return Err(format!("invalid type without an identifier. found `{}`", x)),
+        };
+        let mut generics = vec![];
+        if unwrap_some!(self.tokens.peek()).type_ == TokenType::Less {
+            // parse for generics
+            self.advance(); // eat '<'
+            loop {
+                match unwrap_some!(self.tokens.peek()).type_ {
+                    TokenType::Identifier(ref argname) => {
+                        generics.push(argname.to_string());
+                        self.advance();
+                    }
+                    ref x => return Err(format!("expected identifier in generic. found {}", x)),
+                }
+                if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                    self.advance(); // Eat ','
+                    continue;
+                }
+                if unwrap_some!(self.tokens.peek()).type_ == TokenType::Greater {
+                    self.advance(); // eat '>'
+                    break;
+                }
+            }
+        }
+        Ok(TypeAnnot {
+            name: type_name,
+            generics,
+            traits: vec![],
+        })
+    }
+
+    pub fn parse_function(&mut self) -> Result<(Node<'a>, Span)> {
+        // always returns a function node
+        // println!("def {:?}", self.tokens.peek());
+        // println!("toks {:#?}", self.tokens);
+
+        self.advance(); // eat 'def'
+        let mut span = self.span;
+        let mut ret_type = None;
+        let mut args = vec![];
+
+        let token = self.advance();
+        let name = match token.type_ {
+            TokenType::Identifier(ref n) => n.clone(),
+            ref x => return Err(format!("expected a function name after 'def'. found {}", x)),
+        };
+
+        let token = self.advance();
+        match token.type_ {
+            TokenType::LParen => {
+                if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                    self.advance(); // Eat ')'
+                } else {
+                    loop {
+                        match unwrap_some!(self.tokens.peek()).type_ {
+                            TokenType::Identifier(ref argname) => {
+                                let argname_clone = std::borrow::Cow::Owned(argname.clone());
+                                self.advance();
+                                if unwrap_some!(self.tokens.peek()).type_ == TokenType::Colon {
+                                    self.advance(); // eat ':'
+                                    args.push((argname_clone, Some(self.parse_type()?)));
+                                } else {
+                                    args.push((argname_clone, None));
+                                }
+                            }
+                            ref x => return Err(format!("expected identifier. found {}", x)),
+                        }
+                        if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                            self.advance(); // Eat ','
+                            continue;
+                        }
+                        if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                            self.advance(); // eat ')'
+                            break;
+                        }
+                    }
+                }
+            }
+            ref x => {
+                return Err(format!(
+                    "expected arguments after function name. found {}",
+                    x
+                ))
+            }
+        };
+
+        if unwrap_some!(self.tokens.peek()).type_ == TokenType::Arrow {
+            self.advance();
+            ret_type = Some(self.parse_type()?);
+        };
+        // println!("function body {:?}", self.tokens.peek());
+        span.1 = self.span.1;
+
+        Ok((
+            Node::Function(
+                std::borrow::Cow::Owned(name),
+                args,
+                Box::new(self.parse_expression()?.0),
+                ret_type,
+            ),
+            span,
+        ))
+    }
+}
+
+
+=== FILE: program.rs ===
+-------------------------------------
+use crate::codegen::Node;
+use crate::lexer::tokens::{Span, Token, TokenType};
+use crate::lexer::Lexer;
+use crate::parser::Parser;
+use crate::{unwrap_some, Result};
+
+impl<'a> Parser<'_> {
+    pub fn parse_program(&mut self) -> Result<(Node<'a>, Span, String)> {
+        // node, span, file
+        let mut vals = vec![];
+        let span = self.span;
+        let file = self.file.clone();
+        loop {
+            match self.parse_program_() {
+                Ok((Node::Program(p), _)) => vals.append(&mut p.clone()), // unreachable i guess?
+                Ok((result, _)) => vals.push((result, span, file.clone())), // todo: make it correct
+                Err(s) if s == *"EOF" => {
+                    break;
+                }
+                Err(e) => return Err(e),
+            }
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::Semicolon {
+                self.advance();
+            }
+        }
+        Ok((Node::Program(vals), span, file))
+    }
+
+    pub fn parse_program_(&mut self) -> Result<(Node<'a>, Span)> {
+        match unwrap_some!(self.tokens.peek()).type_ {
+            TokenType::Def => self.parse_function(),
+            TokenType::Struct => self.parse_struct(),
+            TokenType::Extern => self.parse_extern(),
+            TokenType::Use => self.parse_use(),
+            _ => {
+                let (expr, span) = self.parse_expression()?;
+                Ok((Node::Expr(Box::new(expr)), span))
+            }
+        }
+        .clone()
+    }
+
+    pub fn parse_struct(&mut self) -> Result<(Node<'a>, Span)> {
+        let mut span = self.span;
+
+        self.advance(); // eat 'struct'
+
+        let _file = self.file.clone();
+
+        let name = match self.advance().type_ {
+            TokenType::Identifier(i) => i.to_string(),
+            ref x => {
+                return Err(format!(
+                    "expected identifier after struct keyword. found `{}`",
+                    x
+                ))
+            }
+        };
+
+        let mut generics = vec![];
+
+        if unwrap_some!(self.tokens.peek()).type_ == TokenType::Less {
+            self.advance(); // eat '<'
+            loop {
+                match unwrap_some!(self.tokens.peek()).type_ {
+                    TokenType::Identifier(ref argname) => {
+                        generics.push(std::borrow::Cow::Owned(argname.clone()));
+                        self.advance();
+                    }
+                    ref x => return Err(format!("expected identifier in generic. found {}", x)),
+                }
+                if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                    self.advance(); // Eat ','
+                    continue;
+                }
+                if unwrap_some!(self.tokens.peek()).type_ == TokenType::Greater {
+                    self.advance(); // eat '>'
+                    break;
+                }
+            }
+        }
+
+        let mut fields = vec![];
+        loop {
+            match unwrap_some!(self.tokens.peek()).type_ {
+                TokenType::End => {
+                    self.advance(); // eat 'end'
+                    break;
+                }
+                TokenType::Identifier(ref i) => {
+                    let field_name = i.clone();
+                    self.advance(); // eat 'identifier'
+                                    // match unwrap_some!(self.tokens.peek()).type_ {
+                                    //     TokenType::Colon=>{}
+                                    //     _=>return Err()
+                                    // }
+
+                    let field_type = self.parse_type()?;
+
+                    fields.push((std::borrow::Cow::Owned(field_name), field_type));
+                }
+                ref x => {
+                    return Err(format!(
+                        "expected identifier in field of struct `{name}`'s definition. found {}",
+                        x
+                    ))
+                }
+            }
+        }
+
+        span.1 = self.span.1;
+
+        Ok((Node::Struct(name.into(), generics, fields), span))
+    }
+
+    pub fn parse_extern(&mut self) -> Result<(Node<'a>, Span)> {
+        let mut span = self.span;
+
+        self.advance(); // eat 'extern'
+
+        let mut args = vec![];
+
+        let token = self.advance();
+        let name = match token.type_ {
+            TokenType::Identifier(ref n) => n.clone(),
+            ref x => {
+                return Err(format!(
+                    "expected a function name after 'extern'. found {}",
+                    x
+                ))
+            }
+        };
+        // println!("def after name {:?}", self.tokens.peek());
+
+        let token = self.advance();
+        match token.type_ {
+            TokenType::LParen => {
+                if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                    self.advance(); // Eat ')'
+                } else {
+                    loop {
+                        args.push(self.parse_type()?);
+                        if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                            self.advance(); // Eat ','
+                            if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                                self.advance(); // eat ')'
+                                break;
+                            }
+                            continue;
+                        } else {
+                            return Err(format!(
+                                "Expected ',' after type in `extern` definition. found {}",
+                                unwrap_some!(self.tokens.peek()).type_
+                            ));
+                        }
+                    }
+                    if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                        self.advance(); // eat trailing ','
+                    }
+                }
+            }
+            ref x => {
+                return Err(format!(
+                    "expected arguments after function name. found {}",
+                    x
+                ))
+            }
+        };
+
+        let ret_type = if unwrap_some!(self.tokens.peek()).type_ == TokenType::Arrow {
+            self.advance();
+            self.parse_type()?
+        } else {
+            return Err(format!(
+                "Expected an arrow followed by a return type after extern definition. found {}",
+                unwrap_some!(self.tokens.peek()).type_
+            ));
+        };
+
+        span.1 = self.span.1;
+
+        Ok((
+            Node::Extern(std::borrow::Cow::Owned(name), args, ret_type),
+            span,
+        ))
+    }
+
+    pub fn parse_use(&mut self) -> Result<(Node<'a>, Span)> {
+        let mut span = self.span;
+
+        self.advance(); // eat 'use'
+
+        let _file = self.file.clone();
+
+        let modulename = match self.advance().type_ {
+            TokenType::String(s) => s.to_string(),
+            TokenType::Identifier(s) => s.to_string(),
+            ref x => return Err(format!("invalid `use` module. {x}")),
+        };
+        let lexer = Lexer::from_file(&modulename).unwrap();
+        let prevstate = (self.span, self.file.clone(), self.tokens.clone());
+        let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
+        tokens.push(Token {
+            type_: TokenType::Int(0),
+            span: Span((0, 1), (0, 1)),
+            file: modulename.to_string(),
+        });
+        self.tokens = tokens.into_iter().peekable();
+        self.file = modulename.to_string();
+        self.span = Span((0, -1), (0, -1));
+        let (Node::Program(ast), _, _) = self.parse_program()? else {
+            unreachable!()
+        };
+
+        self.span = prevstate.0;
+        self.file = prevstate.1;
+        self.tokens = prevstate.2;
+
+        span.1 = self.span.1;
+
+        Ok((Node::Program(ast.clone()), span))
+    }
+}
+
+
+=== FILE: tests.rs ===
+-------------------------------------
+use crate::codegen::Literal;
+use crate::lexer::Lexer;
+use crate::parser::*;
+
+macro_rules! parse {
+    ($source: expr, $expected: expr) => {
+        let lexer = Lexer::from_text($source, "##test##");
+        let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
+        tokens.push(Token {
+            type_: TokenType::Int(0),
+            span: Span((1, 0), (1, 0)),
+            file: "##test##".to_string(),
+        }); // HACK: adding a blank expression to the end of the parser. else, the last expression isn't parsed
+        assert_eq!(
+            Parser::new(tokens.into_iter().peekable(), "##test##")
+                .parse_expression()
+                .unwrap()
+                .0,
+            $expected
+        )
+    };
+    ($source_path: expr) => {
+        let lexer = Lexer::from_file($source_path).unwrap();
+        let mut tokens = lexer.map(|t| t.unwrap()).collect::<Vec<_>>();
+        tokens.push(Token {
+            type_: TokenType::Int(0),
+            span: Span((1, 0), (1, 0)),
+            file: $source_path.to_string(),
+        }); // HACK: adding a blank expression to the end of the parser. else, the last expression isn't parsed
+        assert!(Parser::new(tokens.into_iter().peekable(), $source_path).parse_program().is_ok())
+    }
+}
+
+#[test]
+fn test_comments() {
+    parse!("test_inputs/test_comments.bk");
+}
+
+#[test]
+fn test_expressions() {
+    parse!("test_inputs/test_expressions.bk");
+}
+
+#[test]
+fn test_function() {
+    parse!("test_inputs/test_function.bk");
+}
+
+#[test]
+fn test_structs() {
+    parse!("test_inputs/test_structs.bk");
+}
+
+#[test]
+#[should_panic]
+fn test_invalid_if() {
+    parse!("test_inputs/test_invalid_if.bk");
+}
+
+#[test]
+fn test_tuples() {
+    parse!(
+        "(1,2,3)",
+        Expr::Tuple(
+            vec![
+                Expr::Literal(Literal::Int(1).into(), Span((0, 0), (0, 0)), "".to_string()),
+                Expr::Literal(Literal::Int(2).into(), Span((0, 0), (0, 0)), "".to_string()),
+                Expr::Literal(Literal::Int(3).into(), Span((0, 0), (0, 0)), "".to_string()),
+            ],
+            Span((0, 0), (0, 0)),
+            "".to_string()
+        )
+    );
+}
+
+#[test]
+fn test_call() {
+    parse!(
+        "x(1,)()()",
+        Expr::Call(
+            Box::new(Expr::Call(
+                Box::new(Expr::Call(
+                    Box::new(Expr::Variable(
+                        "x".into(),
+                        Span((0, 0), (0, 0)),
+                        "".to_string()
+                    )),
+                    vec![Expr::Literal(
+                        Literal::Int(1).into(),
+                        Span((0, 0), (0, 0)),
+                        "".to_string()
+                    ),],
+                    Span((0, 0), (0, 0)),
+                    "".to_string()
+                )),
+                vec![],
+                Span((0, 0), (0, 0)),
+                "".to_string()
+            )),
+            vec![],
+            Span((0, 0), (0, 0)),
+            "".to_string()
+        )
+    );
+}
+
+#[test]
+fn test_index() {
+    parse!(
+        "x[0]",
+        Expr::Index(
+            Box::new(Expr::Variable(
+                "x".into(),
+                Span((0, 0), (0, 0)),
+                "".to_string()
+            )),
+            Box::new(Expr::Literal(
+                Literal::Int(0).into(),
+                Span((0, 0), (0, 0)),
+                "".to_string()
+            )),
+            Span((0, 0), (0, 0)),
+            "".to_string()
+        )
+    );
+}
+
+#[test]
+fn test_array() {
+    parse!(
+        "[1,2,3,]",
+        Expr::Array(
+            vec![
+                Expr::Literal(Literal::Int(1).into(), Span((0, 0), (0, 0)), "".to_string(),),
+                Expr::Literal(Literal::Int(2).into(), Span((0, 0), (0, 0)), "".to_string(),),
+                Expr::Literal(Literal::Int(3).into(), Span((0, 0), (0, 0)), "".to_string(),),
+            ],
+            Span((0, 0), (0, 0)),
+            "".to_string()
+        )
+    );
+    parse!(
+        "[]",
+        Expr::Array(vec![], Span((0, 0), (0, 0)), "".to_string())
+    );
+    parse!(
+        "[1,2,3]",
+        Expr::Array(
+            vec![
+                Expr::Literal(Literal::Int(1).into(), Span((0, 0), (0, 0)), "".to_string(),),
+                Expr::Literal(Literal::Int(2).into(), Span((0, 0), (0, 0)), "".to_string(),),
+                Expr::Literal(Literal::Int(3).into(), Span((0, 0), (0, 0)), "".to_string(),),
+            ],
+            Span((0, 0), (0, 0)),
+            "".to_string()
+        )
+    );
+    parse!(
+        "[1,]",
+        Expr::Array(
+            vec![Expr::Literal(
+                Literal::Int(1).into(),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
+            ),],
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )
+    );
+    parse!(
+        "[21213]",
+        Expr::Array(
+            vec![Expr::Literal(
+                Literal::Int(21213).into(),
+                Span((0, 0), (0, 0)),
+                "".to_string(),
+            ),],
+            Span((0, 0), (0, 0)),
+            "".to_string(),
+        )
+    );
+}
+
+
+=== FILE: mod.rs ===
+-------------------------------------
+use owo_colors::OwoColorize;
+
+use crate::codegen::Expr;
+use crate::lexer::tokens::{Span, Token, TokenType};
+
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::iter::Peekable;
+use std::marker::PhantomData;
+use std::vec::IntoIter;
+
+pub mod expression;
+pub mod function;
+pub mod program;
+
+#[cfg(test)]
+pub mod tests;
+
+type TokenIter = Peekable<IntoIter<Token>>;
+
+#[derive(Debug, Clone)]
+pub struct NodePosition {
+    pub pos: usize,
+    pub line_no: usize,
+    pub file: String,
+}
+
+// 'def' name (args) '->' return_type { expressions}
+#[derive(Debug)]
+pub struct Function<'a> {
+    pub name: String,
+    pub args: Vec<(String, String)>,
+    pub expression: Expr<'a>,
+    pub return_type: String,
+}
+
+// 'class' name { functions }
+#[derive(Debug)]
+pub struct Class<'a> {
+    pub name: String,
+    pub fns: Vec<(Function<'a>, NodePosition)>,
+}
+
+/// A parser that generates an abstract syntax tree (AST).
+pub struct Parser<'a> {
+    tokens: TokenIter,
+    span: Span,
+    file: String,
+    phantom: PhantomData<&'a i32>,
+}
+
+impl Parser<'_> {
+    pub fn new(tokens: TokenIter, file_path: &str) -> Self {
+        Parser {
+            tokens,
+            span: Span((-1, -1), (-1, -1)),
+            file: file_path.to_string(),
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn get_tok_precedence(&mut self, tok: TokenType) -> i32 {
+        match tok {
+            TokenType::Equal
+            | TokenType::NotEq
+            | TokenType::Greater
+            | TokenType::GreaterEq
+            | TokenType::Less
+            | TokenType::LessEq => 0,
+            TokenType::Minus | TokenType::Plus => 1,
+            TokenType::DivEq | TokenType::Mul => 2,
+            any => panic!("Bad operator! Unknown {:?}", any),
+        }
+    }
+
+    fn advance(&mut self) -> Token {
+        let next_token = self
+            .tokens
+            .next()
+            .expect("Reached end of tokens unexpectedly");
+        self.span = next_token.span;
+        next_token
+    }
+
+    pub fn error(&self, message: String) {
+        match File::open(&self.file) {
+            Ok(file) => {
+                let reader = BufReader::new(file);
+                let lines: Vec<String> = reader
+                    .lines()
+                    .map(|l| l.expect("Could not read line"))
+                    .collect();
+
+                let (start_line, start_col) = self.span.0;
+                let (end_line, end_col) = self.span.1;
+
+                // Adjust for 0-based indexing (lines and columns are 1-indexed)
+                let start_line = (start_line - 1) as usize;
+                let start_col = start_col as usize;
+                let end_line = (end_line - 1) as usize;
+                let end_col = end_col as usize;
+
+                // Validate line numbers and columns
+                if start_line >= lines.len()
+                    || end_line >= lines.len()
+                    || start_col > lines[start_line].len()
+                    || end_col > lines[end_line].len()
+                {
+                    eprintln!(
+                        "Invalid span: Line or column numbers out of bounds. {:?} {}",
+                        self.span,
+                        lines.len()
+                    );
+                    return;
+                }
+
+                // Extract relevant lines
+                let pre_line = if start_line == 0 {
+                    Some("".to_string())
+                } else {
+                    lines
+                        .get(start_line - 1)
+                        .map(|l| format!("{} | {}", start_line, l))
+                };
+                let current_line = &lines[start_line];
+                let post_line = lines
+                    .get(start_line + 1)
+                    .map(|l| format!("{} | {}", start_line + 2, l));
+
+                // Create pointy indicators
+                let start_pointy = format!("{:~<width$}^", "", width = start_col + 1);
+                let end_pointy = format!("{:^<width$}^", "", width = end_col - start_col);
+                let padding = format!(
+                    "{: <width$}  ",
+                    "",
+                    width = (start_line + 1).ilog10() as usize
+                );
+
+                // Construct the error message
+                let error_message = format!(
+                    "\n\
+                     {}\n\
+                     {} | {}\n\
+                     {}{}{}\n\
+                     {}\n\
+                     {}: {}\n\
+                     at line {}:{} in file `{}`.",
+                    pre_line.unwrap_or_default().yellow(),
+                    (start_line + 1).green(),
+                    current_line.yellow(),
+                    padding,
+                    start_pointy.red(),
+                    end_pointy.red(),
+                    post_line.unwrap_or_default().yellow(),
+                    "[Syntax Error]".red(),
+                    message,
+                    (start_line + 1).green(),
+                    (start_col + 1).green(),
+                    self.file.green(),
+                );
+
+                eprintln!("{}", error_message);
+            }
+            Err(error) => {
+                eprintln!(
+                    "Error: Could not open file: {}. {}",
+                    self.file.green(),
+                    error
+                );
+            }
+        }
+    }
+}
+
+
+=== FILE: expression.rs ===
+-------------------------------------
+use crate::codegen::{BinaryOperator, Expr, Literal, UnaryOperator};
+use crate::lexer::tokens::{Span, TokenType};
+use crate::parser::Parser;
+use crate::{unwrap_some, Result};
+// use log::trace;
+
+fn tokentype_to_binop(tok: TokenType) -> BinaryOperator {
+    match tok {
+        TokenType::Plus => BinaryOperator::Add,
+        TokenType::Minus => BinaryOperator::Sub,
+        TokenType::Mul => BinaryOperator::Mul,
+        TokenType::Div => BinaryOperator::Div,
+        TokenType::Equal => BinaryOperator::Equal,
+        TokenType::Greater => BinaryOperator::Greater,
+        TokenType::Less => BinaryOperator::Less,
+        TokenType::GreaterEq => BinaryOperator::GreaterEqual,
+        TokenType::LessEq => BinaryOperator::LessEqual,
+        TokenType::NotEq => BinaryOperator::NotEqual,
+        TokenType::And => BinaryOperator::And,
+        TokenType::Or => BinaryOperator::Or,
+        _ => panic!("invalid binary operator"),
+    }
+}
+
+impl<'a> Parser<'_> {
+    pub fn parse_expression(&mut self) -> Result<(Expr<'a>, Span)> {
+        // println!("do {:?}", self.tokens.peek());
+        // println!("{:?}", self.tokens.peek());
+        // println!("{:#?}", self.tokens);
+
+        let mut span = self.span;
+
+        let mut l_value = match self.advance().type_ {
+            TokenType::Do => self.parse_do()?.0,
+            TokenType::Int(i) => {
+                Expr::Literal(Literal::Int(i).into(), self.span, self.file.clone())
+            }
+            TokenType::Float(f) => {
+                Expr::Literal(Literal::Float(f).into(), self.span, self.file.clone())
+            }
+            TokenType::True => {
+                Expr::Literal(Literal::Boolean(true).into(), self.span, self.file.clone())
+            }
+            TokenType::False => {
+                Expr::Literal(Literal::Boolean(false).into(), self.span, self.file.clone())
+            }
+            TokenType::String(s) => Expr::Literal(
+                Literal::String(std::borrow::Cow::Owned(s)).into(),
+                self.span,
+                self.file.clone(),
+            ),
+            TokenType::Identifier(i) => {
+                Expr::Variable(std::borrow::Cow::Owned(i), self.span, self.file.clone())
+            }
+            TokenType::LBrack => self.parse_array()?.0,
+            TokenType::If => self.parse_if()?.0,
+            TokenType::Let => self.parse_let()?.0,
+            TokenType::LParen => {
+                let mut v = self.parse_expression()?.0;
+                // println!("{:?}", v);
+                // println!("{:?}", self.tokens.peek());
+                match self.advance().type_ {
+                    TokenType::RParen => {}
+                    TokenType::Comma => v = self.parse_tuple(v)?.0,
+                    ref x => {
+                        return Err(format!(
+                            "unclosed delimiter. expected ')' or ','. found {x}"
+                        ))
+                    }
+                }
+                v
+            }
+            TokenType::While => {
+                let cond = self.parse_expression()?.0;
+                match self.advance().type_ {
+                    TokenType::Then => {}
+                    ref x => {
+                        return Err(format!(
+                            "expected `then` after while-loop condition. found `{}`",
+                            x
+                        ))
+                    }
+                }
+                let body = self.parse_expression()?.0;
+                Expr::While(Box::new(cond), Box::new(body), self.span, self.file.clone())
+            }
+            TokenType::Fn => self.parse_lambda()?.0,
+            TokenType::Minus => Expr::UnaryOp(
+                UnaryOperator::Negate,
+                Box::new(self.parse_expression()?.0),
+                self.span,
+                self.file.clone(),
+            ),
+            TokenType::Break => return Ok((Expr::Break(self.span, self.file.clone()), span)),
+            TokenType::Continue => return Ok((Expr::Continue(self.span, self.file.clone()), span)),
+            TokenType::Return => {
+                return Ok((
+                    Expr::Return(
+                        Box::new(self.parse_expression()?.0),
+                        span,
+                        self.file.clone(),
+                    ),
+                    span,
+                ))
+            }
+            TokenType::Not => Expr::UnaryOp(
+                UnaryOperator::Not,
+                Box::new(self.parse_expression()?.0),
+                self.span,
+                self.file.clone(),
+            ),
+            ref x => return Err(format!("expected a valid expression. found `{}`.", x)),
+        };
+
+        loop {
+            // postfix operators
+            match unwrap_some!(self.tokens.peek()).type_ {
+                TokenType::LBrack => {
+                    self.advance(); // eat '['
+                    let index = self.parse_expression();
+                    span.1 = self.span.1;
+
+                    l_value = Expr::Index(
+                        Box::new(l_value),
+                        Box::new(index?.0),
+                        span,
+                        self.file.clone(),
+                    );
+                    if let TokenType::RBrack = unwrap_some!(self.tokens.peek()).type_ {
+                        self.advance(); // eat ']'
+                    } else {
+                        return Err("unclosed delimiter ']' after array index.".to_string());
+                    }
+
+                    if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
+                        self.advance(); // eat trailing ','
+                    }
+
+                    span.1 = self.span.1;
+                }
+                TokenType::LParen => {
+                    // call
+                    self.advance(); // eat '('
+                    let mut args = vec![];
+                    span.1 = self.span.1;
+
+                    loop {
+                        if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                            break;
+                        }
+                        args.push(self.parse_expression()?.0);
+                        span.1 = self.span.1;
+
+                        if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                            self.advance(); // Eat ','
+                            continue;
+                        }
+                    }
+
+                    l_value = Expr::Call(Box::new(l_value), args, span, self.file.clone());
+
+                    if let TokenType::Comma = unwrap_some!(self.tokens.peek()).type_ {
+                        self.advance(); // eat trailing ','
+                    }
+
+                    if let TokenType::RParen = unwrap_some!(self.tokens.peek()).type_ {
+                        self.advance(); // eat ')'
+                    }
+
+                    span.1 = self.span.1;
+                }
+                TokenType::Dot => {
+                    self.advance(); // eat '.'
+
+                    let field = match self.advance().type_ {
+                        TokenType::Identifier(i) => i,
+                        x => {
+                            return Err(format!(
+                                "expected identifier after '.' for struct field access. found {}",
+                                x
+                            ))
+                        }
+                    };
+                    l_value =
+                        Expr::StructAccess(Box::new(l_value), field.into(), span, self.file.clone())
+                }
+                TokenType::Assign => {
+                    match l_value {
+                        Expr::Variable(..) | Expr::StructAccess(..) | Expr::Index(..) => {
+                            self.advance(); // eat '='
+                            span.1 = self.span.1;
+                            l_value = Expr::Assign(
+                                Box::new(l_value),
+                                Box::new(self.parse_expression()?.0),
+                                span,
+                                self.file.clone(),
+                            );
+                        }
+                        _ => return Err("invalid expression on LHS of assignment.".to_string()),
+                    }
+                }
+                _ => {
+                    break;
+                }
+            }
+        }
+
+        while let TokenType::Plus
+        | TokenType::Minus
+        | TokenType::Mul
+        | TokenType::Div
+        | TokenType::Equal
+        | TokenType::Greater
+        | TokenType::Less
+        | TokenType::GreaterEq
+        | TokenType::LessEq
+        | TokenType::NotEq
+        | TokenType::And
+        | TokenType::Or = unwrap_some!(self.tokens.peek()).type_
+        {
+            let op = tokentype_to_binop(self.advance().type_);
+            let r_value = self.parse_expression()?.0;
+            span.1 = self.span.1;
+
+            l_value = Expr::BinaryOp(
+                Box::new(l_value),
+                op,
+                Box::new(r_value),
+                span,
+                self.file.clone(),
+            )
+        }
+
+        span.1 = self.span.1;
+
+        Ok((l_value, span))
+    }
+
+    fn parse_do(&mut self) -> Result<(Expr<'a>, Span)> {
+        let mut expressions = vec![];
+
+        let mut span = self.span;
+
+        let _file = self.file.clone();
+
+        if unwrap_some!(self.tokens.peek()).type_ == TokenType::End {
+            return Err("cannot have an empty `do` expression".to_string());
+        }
+        loop {
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::End {
+                self.advance(); // Eat 'end'
+                break;
+            } else {
+                // println!("do-body {:?}", self.tokens.peek());
+                expressions.push(self.parse_expression()?.0);
+                span.1 = self.span.1;
+            }
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::Semicolon {
+                self.advance();
+            }
+        }
+        span.1 = self.span.1;
+
+        Ok((Expr::Do(expressions, span, self.file.clone()), span))
+    }
+
+    fn parse_array(&mut self) -> Result<(Expr<'a>, Span)> {
+        let mut args = vec![];
+
+        let mut span = self.span;
+
+        let _file = self.file.clone();
+
+        // println!("{:?}", self.tokens.peek());
+        loop {
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::RBrack {
+                self.advance(); // eat ']'
+                break;
+            }
+
+            args.push(self.parse_expression()?.0);
+            span.1 = self.span.1;
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                self.advance(); // Eat ','
+                continue;
+            }
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::RBrack {
+                self.advance(); // eat ']'
+                break;
+            } else {
+                return Err(format!(
+                    "Expected ']' or ','. unclosed delimiter in array. found {}",
+                    self.advance().type_
+                ));
+            }
+        }
+        span.1 = self.span.1;
+
+        Ok((Expr::Array(args, span, self.file.clone()), span))
+    }
+
+    fn parse_tuple(&mut self, expr: Expr<'a>) -> Result<(Expr<'a>, Span)> {
+        let mut vals = vec![expr];
+
+        let mut span = self.span;
+
+        let _file = self.file.clone();
+
+        loop {
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                self.advance(); // eat ')'
+                break;
+            }
+            vals.push(self.parse_expression()?.0);
+            span.1 = self.span.1;
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                self.advance(); // eat ')'
+                break;
+            }
+            if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                self.advance(); // eat ','
+            } else {
+                return Err(format!(
+                    "expected ',' or `)` in tuple found {} instead. unclosed delimiter in tuple.",
+                    self.advance().type_
+                ));
+            }
+        }
+        span.1 = self.span.1;
+
+        Ok((Expr::Tuple(vals, span, self.file.clone()), span))
+    }
+
+    fn parse_if(&mut self) -> Result<(Expr<'a>, Span)> {
+        let mut span = self.span;
+
+        let _file = self.file.clone();
+
+        let cond = self.parse_expression()?.0;
+
+        match unwrap_some!(self.tokens.peek()).type_ {
+            TokenType::Then => {}
+            ref x => {
+                return Err(format!(
+                    "Expected `then` after `if` condition. 
+                    found `{}`.",
+                    x
+                ))
+            }
+        }
+        self.advance(); // eat 'then'
+
+        let if_branch = self.parse_expression()?.0;
+        span.1 = self.span.1;
+
+        match unwrap_some!(self.tokens.peek()).type_ {
+            TokenType::Else => {
+                self.advance();
+                let else_branch = self.parse_expression()?.0;
+                span.1 = self.span.1;
+
+                Ok((
+                    Expr::If(
+                        Box::new(cond),
+                        Box::new(if_branch),
+                        Some(Box::new(else_branch)),
+                        span,
+                        self.file.clone(),
+                    ),
+                    span,
+                ))
+            }
+            _ => Ok((
+                Expr::If(
+                    Box::new(cond),
+                    Box::new(if_branch),
+                    None,
+                    span,
+                    self.file.clone(),
+                ),
+                span,
+            )),
+        }
+    }
+
+    fn parse_let(&mut self) -> Result<(Expr<'a>, Span)> {
+        let mut span = self.span;
+
+        let _file = self.file.clone();
+
+        let identifier: std::borrow::Cow<'_, str> = match self.advance().type_ {
+            TokenType::Identifier(ref i) => std::borrow::Cow::Owned(i.clone()),
+            ref x => {
+                return Err(format!(
+                    "Expected `identifier` after `let` keyword. Found `{}`",
+                    x
+                ))
+            }
+        };
+
+        let type_ = match unwrap_some!(self.tokens.peek()).type_ {
+            TokenType::Colon => {
+                self.advance(); // eat ':'
+                Some(self.parse_type()?)
+            }
+            _ => None,
+        };
+
+        match self.advance().type_ {
+            TokenType::Assign => {}
+            ref x => return Err(format!("expected `=` after `let`. Found `{}`", x)),
+        }
+
+        let val = self.parse_expression()?.0;
+        span.1 = self.span.1;
+
+        Ok((
+            Expr::Let(identifier, type_, Box::new(val), span, self.file.clone()),
+            span,
+        ))
+    }
+
+    fn parse_lambda(&mut self) -> Result<(Expr<'a>, Span)> {
+        let mut args = vec![];
+
+        let mut span = self.span;
+
+        let _file = self.file.clone();
+
+        let token = self.advance(); // Call advance and store the token
+
+        match token.type_ {
+            TokenType::LParen => {
+                if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                    self.advance(); // Eat ')'
+                } else {
+                    loop {
+                        match unwrap_some!(self.tokens.peek()).type_ {
+                            TokenType::Identifier(ref argname) => {
+                                let argname_clone = std::borrow::Cow::Owned(argname.clone());
+                                self.advance();
+                                if unwrap_some!(self.tokens.peek()).type_ == TokenType::Colon {
+                                    self.advance(); // eat ':'
+                                    args.push((argname_clone, Some(self.parse_type()?)));
+                                } else {
+                                    args.push((argname_clone, None));
+                                }
+                            }
+                            ref x => return Err(format!("expected identifier. found `{}`", x)),
+                        }
+                        if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
+                            self.advance(); // Eat ','
+                            continue;
+                        }
+                        if unwrap_some!(self.tokens.peek()).type_ == TokenType::RParen {
+                            self.advance(); // eat ')'
+                            break;
+                        }
+                    }
+                }
+            }
+            ref x => {
+                return Err(format!(
+                    "expected arguments after function name. found `{}`",
+                    x
+                ))
+            }
+        };
+        span.1 = self.span.1;
+
+        Ok((
+            Expr::Lambda(
+                args,
+                Box::new(self.parse_expression()?.0),
+                span,
+                self.file.clone(),
+            ),
+            span,
+        ))
+    }
+}
+
+
+### End of File Contents ###
