@@ -21,6 +21,7 @@ struct Response{
 extern "C" {
 
     void exit(int n);
+    int puts(const char *__s);
 
     int printint(int n) {
         printf("%d", n); // Print integer followed by a newline

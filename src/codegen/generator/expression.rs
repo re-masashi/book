@@ -269,57 +269,102 @@ impl<'ctx> IRGenerator<'ctx> {
             TypedExpr::Array(elements, type_, _span, _file) => {
                 let element_type = match type_.as_ref() {
                     Type::Constructor(TypeConstructor { generics, .. }) => generics[0].clone(),
-                    _ => return Err("Invalid array type".to_string()),
+                    _ => return Err("Invalid array type".into()),
                 };
+                let _i8_ptr_type = self.context.ptr_type(AddressSpace::default());
+                let array_struct_type = self.context.struct_type(
+                    &[
+                        self.context.ptr_type(AddressSpace::default()).into(), // data ptr
+                        self.context.i32_type().into(),                        // len
+                        self.context.i32_type().into(),                        // capacity
+                    ],
+                    false,
+                );
 
-                let llvm_elem_ty = self.type_to_llvm(element_type.clone()).as_basic_enum(self.context);
-                let array_len = elements.len() as u64;
+                let llvm_elem_ty = self
+                    .type_to_llvm(element_type.clone())
+                    .as_basic_enum(self.context);
+                let element_size = llvm_elem_ty.size_of().unwrap();
 
-                // Allocate space on heap
-                let total_size = self.context.i32_type().const_int(array_len, false);
-                let malloc_fn = self.module.get_function("GC_malloc").ok_or("malloc not found")?;
+                let len = elements.len() as u64;
+                let capacity = len.max(len * 2); // minimum starting capacity
 
-                let elem_size = llvm_elem_ty.size_of().unwrap();
-                let alloc_size = self.builder.build_int_mul(total_size, elem_size, "alloc_size").unwrap();
+                let total_size =
+                    element_size.const_mul(self.context.i32_type().const_int(capacity, false));
+                let malloc_fn = self.module.get_function("GC_malloc").unwrap(); // assumed available
                 let raw_ptr = self
                     .builder
-                    .build_call(malloc_fn, &[alloc_size.into()], "arr_ptr").unwrap()
+                    .build_call(malloc_fn, &[total_size.into()], "malloc_array")
+                    .unwrap()
                     .try_as_basic_value()
                     .left()
                     .unwrap()
-                    .into_pointer_value()
-                    .const_cast(self.context.ptr_type(AddressSpace::from(0)));
+                    .into_pointer_value();
 
-                // Store each element
+                // Cast malloced i8* to element pointer
+                let data_ptr = self
+                    .builder
+                    .build_bit_cast(
+                        raw_ptr,
+                        self.context.ptr_type(AddressSpace::default()),
+                        "casted_array_ptr",
+                    )
+                    .unwrap()
+                    .into_pointer_value();
+
                 for (i, elem) in elements.iter().enumerate() {
                     let (val, _) = self.gen_expression(elem, function)?;
-                    let index = self.context.i32_type().const_int(i as u64, false);
+                    let elem_val = val.as_basic_enum(self.context);
+
                     let gep = unsafe {
-                        self.builder.build_gep(llvm_elem_ty, raw_ptr, &[index], &format!("arr_gep_{}", i)).unwrap()
+                        self.builder
+                            .build_in_bounds_gep(
+                                llvm_elem_ty,
+                                data_ptr,
+                                &[self.context.i64_type().const_int(i as u64, false)],
+                                &format!("array_gep_{}", i),
+                            )
+                            .unwrap()
                     };
-                    self.builder.build_store(gep, val.as_basic_enum(self.context)).unwrap();
+                    self.builder.build_store(gep, elem_val).unwrap();
                 }
 
-                // Create runtime struct: { ptr, len }
-                let array_struct_ty = self.array_struct_type(llvm_elem_ty);
-                let struct_alloc = self.builder.build_alloca(array_struct_ty, "array_struct").unwrap();
+                // Now make the struct { ptr, len, cap }
+                let array_alloca = self
+                    .builder
+                    .build_alloca(array_struct_type, "array_struct")
+                    .unwrap();
 
-                let ptr_field = 
-                    self.builder.build_struct_gep(array_struct_ty, struct_alloc, 0, "ptr_field").unwrap()
-                ;
-                let len_field = 
-                    self.builder.build_struct_gep(array_struct_ty, struct_alloc, 1, "len_field").unwrap()
-                ;
+                let ptr_field = self
+                    .builder
+                    .build_struct_gep(array_struct_type, array_alloca, 0, "ptr_field")
+                    .unwrap();
+                let len_field = self
+                    .builder
+                    .build_struct_gep(array_struct_type, array_alloca, 1, "len_field")
+                    .unwrap();
+                let cap_field = self
+                    .builder
+                    .build_struct_gep(array_struct_type, array_alloca, 2, "cap_field")
+                    .unwrap();
 
                 self.builder.build_store(ptr_field, raw_ptr).unwrap();
                 self.builder
-                    .build_store(len_field, self.context.i64_type().const_int(array_len, false)).unwrap();
+                    .build_store(len_field, self.context.i64_type().const_int(len, false))
+                    .unwrap();
+                self.builder
+                    .build_store(
+                        cap_field,
+                        self.context.i64_type().const_int(capacity, false),
+                    )
+                    .unwrap();
 
                 Ok((
-                    IRValue::Simple(struct_alloc.into()),
+                    IRValue::Simple(array_alloca.into()),
                     IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into()),
                 ))
             }
+
             TypedExpr::While(cond, body, _type_, _span, _file) => {
                 // match **body {
                 //     TypedExpr::Break => {
@@ -415,64 +460,64 @@ impl<'ctx> IRGenerator<'ctx> {
                 }
             }
             TypedExpr::Index(array_expr, index_expr, type_, _span, _file) => {
-                let struct_ptr = self
+                let i32_type = self.context.i32_type();
+                let array_struct_type = self.context.struct_type(
+                    &[
+                        self.context.ptr_type(AddressSpace::default()).into(), // data ptr
+                        self.context.i32_type().into(),                        // len
+                        self.context.i32_type().into(),                        // capacity
+                    ],
+                    false,
+                );
+
+                let array_ptr = self
                     .gen_expression(array_expr, function)?
                     .0
                     .as_basic_enum(self.context)
                     .into_pointer_value();
-
                 let index_val = self
                     .gen_expression(index_expr, function)?
                     .0
                     .as_basic_enum(self.context)
                     .into_int_value();
 
-                // Get element type
-                let element_type = self.type_to_llvm(type_.clone()).as_basic_enum(self.context);
-                let struct_type = self.array_struct_type(element_type);
-
-                // GEP to get ptr and len fields
-                let ptr_gep = 
-                    self.builder
-                        .build_struct_gep(struct_type, struct_ptr, 0, "ptr_gep").unwrap()
-                ;
-                let len_gep = 
-                    self.builder
-                        .build_struct_gep(struct_type, struct_ptr, 1, "len_gep").unwrap()
-                ;
-
-                let array_ptr = self
+                let len_ptr = self
                     .builder
-                    .build_load(self.context.ptr_type(AddressSpace::from(0)), ptr_gep, "array_ptr").unwrap()
-                    .into_pointer_value();
-                let array_len = self
+                    .build_struct_gep(array_struct_type, array_ptr, 1, "len_ptr")
+                    .unwrap();
+                let len_val = self
                     .builder
-                    .build_load(self.context.i32_type(), len_gep, "array_len").unwrap()
+                    .build_load(i32_type, len_ptr, "len_val")
+                    .unwrap()
                     .into_int_value();
 
-                // Bounds check: index < len
-                let in_bounds = self
+                let cmp = self
                     .builder
-                    .build_int_compare(IntPredicate::ULT, index_val, array_len, "in_bounds_check").unwrap();
+                    .build_int_compare(IntPredicate::ULT, index_val, len_val, "index_in_bounds")
+                    .unwrap();
 
                 let ok_bb = self.context.append_basic_block(function, "index_ok");
                 let err_bb = self.context.append_basic_block(function, "index_oob");
-                let merge_bb = self.context.append_basic_block(function, "index_merge");
+                let cont_bb = self.context.append_basic_block(function, "index_cont");
 
                 self.builder
-                    .build_conditional_branch(in_bounds, ok_bb, err_bb).unwrap();
+                    .build_conditional_branch(cmp, ok_bb, err_bb)
+                    .unwrap();
 
-                // Error block: call trap or exit
+                // Error block
                 self.builder.position_at_end(err_bb);
+                let _puts_fn = self
+                    .module
+                    .get_function("puts")
+                    .expect("puts() function not found");
 
-                // Format string for the error message
                 let format_str = self
                     .builder
-                    .build_global_string_ptr("index out of bounds: index is %ld, length is %ld\n", "oob_fmt").unwrap()
-                    .as_pointer_value();
+                    .build_global_string_ptr("Index out of bounds: i=%ld, len=%ld\n", "err_str")
+                    .unwrap();
 
                 // Declare printf if not already declared
-                let printf_fn = self.module.get_function("printf").unwrap_or_else(|| {
+                let printf = self.module.get_function("printf").unwrap_or_else(|| {
                     let i8ptr = self.context.ptr_type(AddressSpace::from(0));
                     self.module.add_function(
                         "printf",
@@ -481,43 +526,52 @@ impl<'ctx> IRGenerator<'ctx> {
                     )
                 });
 
-                // Cast format string to i8*
-                let fmt_cast = self.builder.build_bit_cast(
-                    format_str,
-                    self.context.ptr_type(AddressSpace::from(0)),
-                    "fmt_cast"
-                ).unwrap();
+                self.builder
+                    .build_call(
+                        printf,
+                        &[
+                            format_str.as_pointer_value().into(),
+                            index_val.into(),
+                            len_val.into(),
+                        ],
+                        "call_printf",
+                    )
+                    .unwrap();
 
-                // Call printf with index and len
-                self.builder.build_call(
-                    printf_fn,
-                    &[fmt_cast.into(), index_val.into(), array_len.into()],
-                    "print_oob",
-                ).unwrap();
+                self.builder.build_unreachable().unwrap();
 
-                if let Some(trap_fn) = self.module.get_function("exit") {
-                    let code = self.context.i32_type().const_int(1, false);
-                    self.builder.build_call(trap_fn, &[code.into()], "exit").unwrap();
-                    self.builder.build_unreachable().unwrap();
-                } else {
-                    return Err("no exit() function found for bounds check".to_string());
-                }
-
-                // OK block: perform GEP
+                // Success path
                 self.builder.position_at_end(ok_bb);
-                let elem_ptr = unsafe {
+
+                let ptr_ptr = self
+                    .builder
+                    .build_struct_gep(array_struct_type, array_ptr, 0, "dataptr")
+                    .unwrap();
+                let raw_data = self
+                    .builder
+                    .build_load(
+                        self.context.ptr_type(AddressSpace::default()),
+                        ptr_ptr,
+                        "load_ptr",
+                    )
+                    .unwrap()
+                    .into_pointer_value();
+
+                let llvm_elem_ty = self.type_to_llvm(type_.clone()).as_basic_enum(self.context);
+                let gep = unsafe {
                     self.builder
-                        .build_gep(element_type, array_ptr, &[index_val], "elem_ptr").unwrap()
+                        .build_in_bounds_gep(llvm_elem_ty, raw_data, &[index_val], "data_gep")
+                        .unwrap()
                 };
-                let elem_val = self.builder.build_load(element_type, elem_ptr, "elem_val").unwrap();
-                self.builder.build_unconditional_branch(merge_bb).unwrap();
+                let val = self
+                    .builder
+                    .build_load(llvm_elem_ty, gep, "load_val")
+                    .unwrap();
 
-                // Merge block
-                self.builder.position_at_end(merge_bb);
-                let phi = self.builder.build_phi(element_type, "phi_val").unwrap();
-                phi.add_incoming(&[(&elem_val, ok_bb)]);
+                self.builder.build_unconditional_branch(cont_bb).unwrap();
 
-                Ok((IRValue::Simple(phi.as_basic_value()), self.type_to_llvm(type_.clone())))
+                self.builder.position_at_end(cont_bb);
+                Ok((IRValue::Simple(val), self.type_to_llvm(type_.clone())))
             }
             TypedExpr::StructAccess(structref, field, _ty, _span, _file) => {
                 let (structref, structty) = self.gen_expression(structref, function)?;
@@ -698,10 +752,11 @@ impl<'ctx> IRGenerator<'ctx> {
 
     fn array_struct_type(&self, _elem_type: BasicTypeEnum<'ctx>) -> StructType<'ctx> {
         self.context.struct_type(
-            &[self.context.ptr_type(AddressSpace::from(0)).into(), self.context.i64_type().into()],
+            &[
+                self.context.ptr_type(AddressSpace::from(0)).into(),
+                self.context.i64_type().into(),
+            ],
             false,
         )
     }
-
 }
-

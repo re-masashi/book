@@ -6,5 +6,5 @@ let items = [
 
 println(items[1][1])
 
-items[3] = [1, 2, 3]
+push(items, [8, 9, 10])
 println(items[3][2])

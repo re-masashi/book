@@ -506,260 +506,315 @@ impl<'ctx> IRGenerator<'ctx> {
                                     ),
                                 ))
                             }
-                            "push" => {
-                                if args.len() != 4 {
+                            "len" => {
+                                if args.len() != 1 {
                                     return Err(
-                                        "Invalid number of args provided to `push`.".to_string()
+                                        "Invalid number of args provided to `len`.".to_string()
                                     );
                                 }
-                                if let Type::Constructor(TypeConstructor {
-                                    name,
-                                    generics: _,
-                                    traits: _,
-                                }) = get_type_from_typed_expr(&args[0]).as_ref()
-                                {
-                                    if name != "Array" {
-                                        return Err(format!(
-                                            "Invalid array provided to `push`. Found {:?}",
-                                            &args[0]
-                                        ));
-                                    }
-                                } else {
-                                    return Err(format!(
-                                        "Invalid array provided to `push`. Found {:?}",
-                                        &args[0]
-                                    ));
-                                }
-                                if let Type::Constructor(TypeConstructor {
-                                    name,
-                                    generics: _,
-                                    traits: _,
-                                }) = get_type_from_typed_expr(&args[1]).as_ref()
-                                {
-                                    if name != "int" {
-                                        return Err(format!(
-                                            "Invalid length provided to `push`. Found {:?}",
-                                            &args[1]
-                                        ));
-                                    }
-                                } else {
-                                    return Err(format!(
-                                        "Invalid length provided to `push`. Found {:?}",
-                                        &args[1]
-                                    ));
-                                }
-                                if let Type::Constructor(TypeConstructor {
-                                    name,
-                                    generics: _,
-                                    traits: _,
-                                }) = get_type_from_typed_expr(&args[2]).as_ref()
-                                {
-                                    if name != "int" {
-                                        return Err(format!(
-                                            "Invalid capacity provided to `push`. Found {:?}",
-                                            &args[2]
-                                        ));
-                                    }
-                                } else {
-                                    return Err(format!(
-                                        "Invalid capacity provided to `push`. Found {:?}",
-                                        &args[2]
-                                    ));
-                                }
-                                let (compiled_arr, _arr_ty) =
-                                    self.gen_expression(&args[0], function)?;
-                                let (compiled_len, _len_ty) =
-                                    self.gen_expression(&args[1], function)?;
-                                let (compiled_capacity, _capacity_ty) =
-                                    self.gen_expression(&args[2], function)?;
-                                let (compiled_val, val_ty) =
-                                    self.gen_expression(&args[3], function)?;
 
-                                let arr_ptr_type = self.context.ptr_type(AddressSpace::from(0));
-                                let arr_ptr = compiled_arr
+                                let (compiled_array, _array_ty) =
+                                    self.gen_expression(&args[0], function)?;
+
+                                Ok((
+                                    compiled_array,
+                                    IRType::Simple(self.context.i32_type().into()),
+                                ))
+                            }
+                            "set" => {
+                                if args.len() != 3 {
+                                    return Err(
+                                        "Invalid number of args provided to `set`.".to_string()
+                                    );
+                                }
+
+                                let (compiled_array, _) =
+                                    self.gen_expression(&args[0], function)?;
+                                let (compiled_index, _) =
+                                    self.gen_expression(&args[1], function)?;
+                                let (compiled_value, val_ty) =
+                                    self.gen_expression(&args[2], function)?;
+
+                                let arr_ptr = compiled_array
                                     .as_basic_enum(self.context)
                                     .into_pointer_value();
+                                let index_val =
+                                    compiled_index.as_basic_enum(self.context).into_int_value();
 
-                                // Get the size of the value type (in bits)
-                                let type_size_in_bits = val_ty
+                                let target_ptr = unsafe {
+                                    self.builder
+                                        .build_gep(
+                                            val_ty.as_basic_enum(self.context),
+                                            arr_ptr,
+                                            &[index_val],
+                                            "set_ptr",
+                                        )
+                                        .unwrap()
+                                };
+
+                                self.builder
+                                    .build_store(
+                                        target_ptr,
+                                        compiled_value.as_basic_enum(self.context),
+                                    )
+                                    .unwrap();
+
+                                Ok((
+                                    IRValue::Simple(self.context.i32_type().const_zero().into()), // void-ish
+                                    IRType::Simple(self.context.i32_type().into()),
+                                ))
+                            }
+                            "push" => {
+                                if args.len() != 2 {
+                                    return Err(
+                                        "`push` expects exactly 2 arguments: array and value."
+                                            .to_string(),
+                                    );
+                                }
+
+                                let (compiled_array, _array_ty) =
+                                    self.gen_expression(&args[0], function)?;
+                                let (compiled_value, val_ty) =
+                                    self.gen_expression(&args[1], function)?;
+                                // println!("{:?}", get_type_from_typed_expr(&args[0]));
+                                let array_elem_ty =
+                                    match get_type_from_typed_expr(&args[0]).as_ref() {
+                                        Type::Constructor(c) if c.name == "Array" => {
+                                            c.generics[0].clone()
+                                        }
+                                        _ => todo!(),
+                                    };
+                                let _array_elem_llvm_ty = self.type_to_llvm(array_elem_ty.clone());
+                                // println!("{:?}", array_elem_llvm_ty);
+                                let array_struct_type = self.context.struct_type(
+                                    &[
+                                        self.context.ptr_type(AddressSpace::default()).into(), // data ptr
+                                        self.context.i32_type().into(), // len
+                                        self.context.i32_type().into(), // capacity
+                                    ],
+                                    false,
+                                );
+
+                                let struct_ptr = compiled_array
                                     .as_basic_enum(self.context)
-                                    .size_of()
-                                    .expect("Failed to get size of type");
+                                    .into_pointer_value();
+                                let struct_type = array_struct_type; // struct_ptr.get_type(); //.get_inner_type().into_struct_type();
 
-                                let type_size_in_bits = self
+                                // Get field pointers
+                                let ptr_ptr = self
+                                    .builder
+                                    .build_struct_gep(struct_type, struct_ptr, 0, "ptr_ptr")
+                                    .unwrap();
+                                let len_ptr = self
+                                    .builder
+                                    .build_struct_gep(struct_type, struct_ptr, 1, "len_ptr")
+                                    .unwrap();
+                                let cap_ptr = self
+                                    .builder
+                                    .build_struct_gep(struct_type, struct_ptr, 2, "cap_ptr")
+                                    .unwrap();
+
+                                let data_ptr = self
+                                    .builder
+                                    .build_load(
+                                        self.context.ptr_type(AddressSpace::default()),
+                                        ptr_ptr,
+                                        "data_ptr",
+                                    )
+                                    .unwrap()
+                                    .into_pointer_value();
+
+                                let len_val = self
+                                    .builder
+                                    .build_load(self.context.i32_type(), len_ptr, "len")
+                                    .unwrap()
+                                    .into_int_value();
+
+                                let cap_val = self
+                                    .builder
+                                    .build_load(self.context.i32_type(), cap_ptr, "cap")
+                                    .unwrap()
+                                    .into_int_value();
+
+                                let type_size =
+                                    val_ty.as_basic_enum(self.context).size_of().unwrap();
+                                let type_size_i32 = self
                                     .builder
                                     .build_int_cast(
-                                        type_size_in_bits,
+                                        type_size,
                                         self.context.i32_type(),
                                         "type_size_i32",
                                     )
                                     .unwrap();
 
-                                let malloc_func = self
+                                let malloc_fn = self
                                     .module
                                     .get_function("GC_malloc")
-                                    .expect("malloc not found");
+                                    .expect("missing GC_malloc");
 
-                                // Get the current array's length and capacity
-                                let current_len = compiled_len.as_basic_enum(self.context);
-                                let current_capacity =
-                                    compiled_capacity.as_basic_enum(self.context);
-
-                                let len_equals_capacity = self
+                                let len_eq_cap = self
                                     .builder
                                     .build_int_compare(
                                         IntPredicate::EQ,
-                                        current_len.into_int_value(),
-                                        current_capacity.into_int_value(),
+                                        len_val,
+                                        cap_val,
                                         "len_eq_cap",
                                     )
                                     .unwrap();
 
-                                let _array_size = self
-                                    .builder
-                                    .build_int_mul(
-                                        current_capacity.into_int_value(),
-                                        type_size_in_bits,
-                                        "new_capacity",
-                                    )
-                                    .unwrap();
-
-                                let push_block = self.context.append_basic_block(function, "push");
                                 let grow_block = self.context.append_basic_block(function, "grow");
+                                let push_block = self.context.append_basic_block(function, "push");
                                 let end_block = self.context.append_basic_block(function, "end");
 
                                 self.builder
-                                    .build_conditional_branch(
-                                        len_equals_capacity,
-                                        grow_block,
-                                        push_block,
-                                    )
+                                    .build_conditional_branch(len_eq_cap, grow_block, push_block)
                                     .unwrap();
 
+                                // === Grow block ===
                                 self.builder.position_at_end(grow_block);
-
-                                // grow block stuff
-                                let new_capacity = self
+                                let new_cap = self
                                     .builder
                                     .build_int_mul(
-                                        current_capacity.into_int_value(),
+                                        cap_val,
                                         self.context.i32_type().const_int(2, false),
                                         "new_cap",
                                     )
                                     .unwrap();
 
-                                // let malloc_size = self
-                                //     .builder
-                                //     .build_int_mul(new_capacity, type_size_in_bits, "malloc_size")
-                                //     .unwrap();
+                                let malloc_size = self
+                                    .builder
+                                    .build_int_mul(new_cap, type_size_i32, "malloc_size")
+                                    .unwrap();
+
                                 let malloc_size_i64 = self
                                     .builder
                                     .build_int_z_extend(
-                                        new_capacity,
+                                        malloc_size,
                                         self.context.i64_type(),
                                         "malloc_size_i64",
                                     )
                                     .unwrap();
-                                let new_arr_ptr = self
+
+                                let new_arr = self
                                     .builder
-                                    .build_call(malloc_func, &[malloc_size_i64.into()], "new_arr")
+                                    .build_call(malloc_fn, &[malloc_size_i64.into()], "new_arr")
                                     .unwrap()
                                     .try_as_basic_value()
-                                    .unwrap_left();
-                                let memcopy_func = self
+                                    .left()
+                                    .unwrap()
+                                    .into_pointer_value();
+
+                                // Copy old values to new array
+                                let memcpy_fn = self
                                     .module
                                     .get_function("llvm.memcpy.p0.p0.i64")
                                     .unwrap_or_else(|| {
-                                        let fn_type = self.context.void_type().fn_type(
+                                        let fn_ty = self.context.void_type().fn_type(
                                             &[
-                                                self.context.ptr_type(AddressSpace::from(0)).into(),
-                                                self.context.ptr_type(AddressSpace::from(0)).into(),
-                                                self.context.i64_type().into(),
-                                                // self.context.i32_type().into(),
-                                                self.context.bool_type().into(),
+                                                self.context
+                                                    .ptr_type(AddressSpace::default())
+                                                    .into(), // dest
+                                                self.context
+                                                    .ptr_type(AddressSpace::default())
+                                                    .into(), // src
+                                                self.context.i64_type().into(), // size
+                                                self.context.bool_type().into(), // is_volatile
                                             ],
                                             false,
                                         );
                                         self.module.add_function(
                                             "llvm.memcpy.p0.p0.i64",
-                                            fn_type,
+                                            fn_ty,
                                             None,
                                         )
                                     });
+
                                 let copy_size = self
                                     .builder
-                                    .build_int_mul(
-                                        current_capacity.into_int_value(),
-                                        type_size_in_bits,
-                                        "copy_size",
-                                    )
+                                    .build_int_mul(len_val, type_size_i32, "copy_size")
                                     .unwrap();
                                 let copy_size_i64 = self
                                     .builder
                                     .build_int_z_extend(
                                         copy_size,
                                         self.context.i64_type(),
-                                        "malloc_size_i64",
+                                        "copy_size_i64",
                                     )
                                     .unwrap();
+
                                 self.builder
                                     .build_call(
-                                        memcopy_func,
+                                        memcpy_fn,
                                         &[
-                                            new_arr_ptr.into(),
-                                            arr_ptr.into(),
+                                            new_arr.into(),
+                                            data_ptr.into(),
                                             copy_size_i64.into(),
-                                            // self.context.i32_type().const_int(0, false).into(),
-                                            self.context.bool_type().const_int(0, false).into(),
+                                            self.context.bool_type().const_zero().into(),
                                         ],
-                                        "memcopy",
+                                        "memcpy",
                                     )
                                     .unwrap();
+
+                                // Write new value at index = len
+                                let new_dest_ptr = unsafe {
+                                    self.builder
+                                        .build_gep(
+                                            val_ty.as_basic_enum(self.context),
+                                            new_arr,
+                                            &[len_val],
+                                            "new_dest_ptr",
+                                        )
+                                        .unwrap()
+                                };
+                                self.builder
+                                    .build_store(
+                                        new_dest_ptr,
+                                        compiled_value.as_basic_enum(self.context),
+                                    )
+                                    .unwrap();
+
+                                // Update array fields
+                                self.builder.build_store(ptr_ptr, new_arr).unwrap();
+                                self.builder.build_store(cap_ptr, new_cap).unwrap();
+
+                                self.builder.build_unconditional_branch(end_block).unwrap();
+
+                                // === Push block (no grow needed) ===
+                                self.builder.position_at_end(push_block);
                                 let dest_ptr = unsafe {
                                     self.builder
                                         .build_gep(
                                             val_ty.as_basic_enum(self.context),
-                                            new_arr_ptr.into_pointer_value(),
-                                            &[current_len.into_int_value()],
+                                            data_ptr,
+                                            &[len_val],
                                             "dest_ptr",
                                         )
                                         .unwrap()
                                 };
                                 self.builder
-                                    .build_store(dest_ptr, compiled_val.as_basic_enum(self.context))
-                                    .unwrap();
-
-                                self.builder
-                                    .build_store(new_arr_ptr.into_pointer_value(), arr_ptr)
+                                    .build_store(
+                                        dest_ptr,
+                                        compiled_value.as_basic_enum(self.context),
+                                    )
                                     .unwrap();
 
                                 self.builder.build_unconditional_branch(end_block).unwrap();
-                                self.builder.position_at_end(push_block);
 
-                                // push block stuff
-                                self.builder
-                                    .build_store(dest_ptr, compiled_val.as_basic_enum(self.context))
-                                    .unwrap();
-                                self.builder.build_unconditional_branch(end_block).unwrap();
+                                // === End block ===
                                 self.builder.position_at_end(end_block);
-
-                                // end block stuff
-
-                                let phi = self
+                                let new_len = self
                                     .builder
-                                    .build_phi(arr_ptr_type, "result_array")
+                                    .build_int_add(
+                                        len_val,
+                                        self.context.i32_type().const_int(1, false),
+                                        "new_len",
+                                    )
                                     .unwrap();
-
-                                phi.add_incoming(&[
-                                    (&new_arr_ptr, grow_block),
-                                    (&arr_ptr, push_block),
-                                ]);
+                                self.builder.build_store(len_ptr, new_len).unwrap();
 
                                 Ok((
-                                    IRValue::Simple(phi.as_basic_value()),
-                                    IRType::Simple(
-                                        self.context.ptr_type(AddressSpace::from(0)).into(),
-                                    ),
+                                    IRValue::Simple(struct_ptr.into()),
+                                    IRType::Simple(struct_ptr.get_type().into()),
                                 ))
                             }
                             _ => unreachable!(),
@@ -816,7 +871,8 @@ impl<'ctx> IRGenerator<'ctx> {
                                     ret.clone(),
                                 )
                                 .into(),
-                            )?
+                            )
+                            .unwrap()
                         else {
                             unreachable!()
                         };

@@ -144,6 +144,11 @@ impl<'ctx> IRGenerator<'ctx> {
             builtins: vec![
                 IRValue::BuiltIn("type".to_string()),
                 IRValue::BuiltIn("print".to_string()),
+                IRValue::BuiltIn("println".to_string()),
+                IRValue::BuiltIn("str".to_string()),
+                IRValue::BuiltIn("array".to_string()),
+                IRValue::BuiltIn("push".to_string()),
+                IRValue::BuiltIn("set".to_string()),
             ],
             loop_bbs: None,
         }
@@ -177,13 +182,28 @@ impl<'ctx> IRGenerator<'ctx> {
             false,
         ); // maybe not needed?
         let _free_func = self.module.add_function("GC_free", free_type, None);
-        
+    }
+
+    pub fn declare_utility_functions(&self) {
         // Declare the exit function
-        let exit_type = self.context.void_type().fn_type(
-            &[self.context.i32_type().into()],
+        let exit_type = self
+            .context
+            .void_type()
+            .fn_type(&[self.context.i32_type().into()], false); // maybe not needed?
+        let _exit_func = self.module.add_function("exit", exit_type, None);
+
+        // Declare the puts function
+        let puts_type = self.context.i32_type().fn_type(
+            &[self.context.ptr_type(AddressSpace::from(0)).into()],
             false,
         ); // maybe not needed?
-        let _exit_func = self.module.add_function("exit", exit_type, None);
+        let _puts_func = self.module.add_function("puts", puts_type, None);
+
+        let printf_type = self
+            .context
+            .i32_type()
+            .fn_type(&[self.context.ptr_type(AddressSpace::from(0)).into()], true);
+        let _print_func = self.module.add_function("printf", printf_type, None);
     }
 
     pub fn gen_program(
@@ -194,6 +214,8 @@ impl<'ctx> IRGenerator<'ctx> {
         optimisation_level: u8,
     ) -> Result<(), String> {
         self.declare_gc_functions();
+        self.declare_utility_functions();
+
         self.variables.insert(
             "type".to_string(),
             (IRValue::BuiltIn("type".to_string()), IRType::BuiltIn),
