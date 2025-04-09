@@ -521,49 +521,6 @@ impl<'ctx> IRGenerator<'ctx> {
                                     IRType::Simple(self.context.i32_type().into()),
                                 ))
                             }
-                            "set" => {
-                                if args.len() != 3 {
-                                    return Err(
-                                        "Invalid number of args provided to `set`.".to_string()
-                                    );
-                                }
-
-                                let (compiled_array, _) =
-                                    self.gen_expression(&args[0], function)?;
-                                let (compiled_index, _) =
-                                    self.gen_expression(&args[1], function)?;
-                                let (compiled_value, val_ty) =
-                                    self.gen_expression(&args[2], function)?;
-
-                                let arr_ptr = compiled_array
-                                    .as_basic_enum(self.context)
-                                    .into_pointer_value();
-                                let index_val =
-                                    compiled_index.as_basic_enum(self.context).into_int_value();
-
-                                let target_ptr = unsafe {
-                                    self.builder
-                                        .build_gep(
-                                            val_ty.as_basic_enum(self.context),
-                                            arr_ptr,
-                                            &[index_val],
-                                            "set_ptr",
-                                        )
-                                        .unwrap()
-                                };
-
-                                self.builder
-                                    .build_store(
-                                        target_ptr,
-                                        compiled_value.as_basic_enum(self.context),
-                                    )
-                                    .unwrap();
-
-                                Ok((
-                                    IRValue::Simple(self.context.i32_type().const_zero().into()), // void-ish
-                                    IRType::Simple(self.context.i32_type().into()),
-                                ))
-                            }
                             "push" => {
                                 if args.len() != 2 {
                                     return Err(
