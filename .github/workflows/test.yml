@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: '0 0 * * *'  # Runs daily at midnight UTC
 
 jobs:
   style:
@@ -52,3 +54,41 @@ jobs:
         with:
           name: release-artifact
           path: target/release
+
+release:
+  needs: build
+  runs-on: ubuntu-latest
+  steps:
+    - name: Set Date Env
+      id: date
+      run: echo "DATE_TAG=nightly-$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+
+    - name: Download Release Artifact
+      uses: actions/download-artifact@v3
+      with:
+        name: release-artifact
+        path: ./release
+
+    - name: Create Nightly Release
+      id: create_release
+      uses: actions/create-release@v1
+      with:
+        tag_name: ${{ env.DATE_TAG }}
+        release_name: Nightly Build ${{ env.DATE_TAG }}
+        draft: false
+        prerelease: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Upload Release Asset
+      uses: actions/upload-release-asset@v1
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./release/lyronc  
+        asset_name: lyronc            
+        asset_content_type: application/octet-stream
+
+    - name: Zip Binary
+      run: |
+        cd release
+        zip lyronc-${{ env.DATE_TAG }}.zip lyronc
