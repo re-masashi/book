@@ -98,17 +98,25 @@ impl<'ctx> IRGenerator<'ctx> {
                 let current_bb = self.builder.get_insert_block().unwrap();
 
                 // Build conditional branch
-                self.builder.build_conditional_branch(
-                    cond_val.as_basic_enum(self.context).into_int_value(),
-                    then_bb,
-                    else_bb.unwrap_or(merge_bb),
-                ).unwrap();
+                self.builder
+                    .build_conditional_branch(
+                        cond_val.as_basic_enum(self.context).into_int_value(),
+                        then_bb,
+                        else_bb.unwrap_or(merge_bb),
+                    )
+                    .unwrap();
 
                 // THEN
                 self.builder.position_at_end(then_bb);
                 let (then_val, ty) = self.gen_expression(if_, function)?;
 
-                if self.builder.get_insert_block().unwrap().get_terminator().is_none() {
+                if self
+                    .builder
+                    .get_insert_block()
+                    .unwrap()
+                    .get_terminator()
+                    .is_none()
+                {
                     self.builder.build_unconditional_branch(merge_bb).unwrap();
                 }
 
@@ -116,7 +124,13 @@ impl<'ctx> IRGenerator<'ctx> {
                 let else_val = if let Some(else_bb) = else_bb {
                     self.builder.position_at_end(else_bb);
                     let (else_val, _) = self.gen_expression(else_.as_ref().unwrap(), function)?;
-                    if self.builder.get_insert_block().unwrap().get_terminator().is_none() {
+                    if self
+                        .builder
+                        .get_insert_block()
+                        .unwrap()
+                        .get_terminator()
+                        .is_none()
+                    {
                         self.builder.build_unconditional_branch(merge_bb).unwrap();
                     }
                     else_val.as_basic_enum(self.context)
