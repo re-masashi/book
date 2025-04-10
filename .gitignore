@@ -3,3 +3,5 @@
 /a.out
 /examples/*.o
 /examples/*.out
+/bench/*.out
+/examples/*.o

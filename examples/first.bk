@@ -1,5 +1,5 @@
 # use "examples/example_struct.bk"
-# use "examples/math.bk"
+use "examples/math.bk"
 
 extern run_socket_server(int, int, ptr,) -> int
 

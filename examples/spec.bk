@@ -1,0 +1,33 @@
+struct Point
+	x int
+	y int
+end
+
+def test_while(n: int) -> int do
+	let i = 0
+	let sum = 0
+	while i < n then do
+		sum = sum + i
+		i = i + 1
+	end
+	sum
+end
+
+def fact(n: int) -> int
+	if n <= 1 then 1 else n * fact(n - 1)
+
+let a = [10, 20, 30, 40];
+println(a[3]);
+
+let p = Point(5, 6);
+println(p.x);
+println(p.y);
+
+println(test_while(5))
+
+println(type("hi"))
+println(type(123))
+println(type(3.14))
+println(type(true));
+
+println(fact(13))

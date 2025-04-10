@@ -453,7 +453,7 @@ impl<'a> TypeEnv {
                         c.generics[0].clone() // always works
                     }
                     ref c => {
-                        todo!("add custom indexing types. {:?}", c)
+                        todo!("add custom indexing types. {:?} {:?} {}", c, span, file)
                     }
                 };
                 return Ok((

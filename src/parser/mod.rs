@@ -129,7 +129,7 @@ impl Parser<'_> {
 
                 // Create pointy indicators
                 let start_pointy = format!("{:~<width$}^", "", width = start_col + 1);
-                let end_pointy = format!("{:^<width$}^", "", width = end_col - start_col);
+                let end_pointy = format!("{:^<width$}^", "", width = if start_col > end_col {1} else {end_col - start_col});
                 let padding = format!(
                     "{: <width$}  ",
                     "",

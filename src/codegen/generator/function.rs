@@ -94,7 +94,7 @@ impl<'ctx> IRGenerator<'ctx> {
         };
 
         if self.module.get_function(&name).is_some() {
-            Err("Function already declared.".to_string()) // maybe allow redeclaration?
+            Err(format!("Function {} already declared.", name).to_string()) // maybe allow redeclaration?
         } else {
             // println!("\n");
             let fn_type = ret_type

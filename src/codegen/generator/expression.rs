@@ -89,151 +89,53 @@ impl<'ctx> IRGenerator<'ctx> {
                 let then_bb = self.context.append_basic_block(function, "then");
                 let merge_bb = self.context.append_basic_block(function, "merge");
 
-                let else_bb = if let Some(ref _else_expr) = else_ {
+                let else_bb = if else_.is_some() {
                     Some(self.context.append_basic_block(function, "else"))
                 } else {
                     None
                 };
 
-                let pre_if_bb = self.builder.get_insert_block().unwrap();
+                let current_bb = self.builder.get_insert_block().unwrap();
 
-                // Build the correct conditional branch *first*
-                if let Some(else_bb) = else_bb {
-                    match self.builder.build_conditional_branch(
-                        cond_val.as_basic_enum(self.context).into_int_value(),
-                        then_bb,
-                        else_bb,
-                    ) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            return Err(format!(
-                                "something went wrong during if-else codegen. {}",
-                                e
-                            ))
-                        }
-                    };
-                } else {
-                    match self.builder.build_conditional_branch(
-                        cond_val.as_basic_enum(self.context).into_int_value(),
-                        then_bb,
-                        merge_bb,
-                    ) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            return Err(format!(
-                                "something went wrong during if-else codegen. {}",
-                                e
-                            ))
-                        }
-                    };
-                };
+                // Build conditional branch
+                self.builder.build_conditional_branch(
+                    cond_val.as_basic_enum(self.context).into_int_value(),
+                    then_bb,
+                    else_bb.unwrap_or(merge_bb),
+                ).unwrap();
 
-                // Then block
+                // THEN
                 self.builder.position_at_end(then_bb);
-                let (then_val, then_ty) = if let Some(_else_bb) = else_bb {
-                    self.gen_expression(if_, function)?
-                } else {
-                    self.gen_expression(if_, function)?;
-                    (
-                        IRValue::Simple(BasicValueEnum::IntValue(
-                            self.context.i32_type().const_zero(),
-                        )),
-                        IRType::Simple(BasicTypeEnum::IntType(self.context.i32_type())),
-                    )
-                };
+                let (then_val, ty) = self.gen_expression(if_, function)?;
 
-                match self
-                    .builder
-                    .get_insert_block()
-                    .unwrap() // always exists
-                    .get_last_instruction()
-                {
-                    None => {}
-                    Some(ins) => {
-                        if ins.get_opcode() == InstructionOpcode::Return
-                            || ins.get_opcode() == InstructionOpcode::Br
-                        {
-                            // println!("brr");
-                            // self.print_ir();
-                            // return Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
-                        } else {
-                            match self.builder.build_unconditional_branch(merge_bb) {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    return Err(format!(
-                                        "something went wrong during `if` codegen. {}",
-                                        e
-                                    ))
-                                }
-                            };
-                        }
-                    }
+                if self.builder.get_insert_block().unwrap().get_terminator().is_none() {
+                    self.builder.build_unconditional_branch(merge_bb).unwrap();
                 }
 
-                // Else block (if present)
+                // ELSE
                 let else_val = if let Some(else_bb) = else_bb {
                     self.builder.position_at_end(else_bb);
-                    let else_expr = else_.clone().unwrap();
-                    let (else_val, _) = self.gen_expression(&else_expr, function)?;
-                    match self
-                        .builder
-                        .get_insert_block()
-                        .unwrap() // always exists
-                        .get_last_instruction()
-                    {
-                        None => {}
-                        Some(ins) => {
-                            if ins.get_opcode() == InstructionOpcode::Return
-                                || ins.get_opcode() == InstructionOpcode::Br
-                            {
-                                // println!("brr");
-                                // self.print_ir();
-                                // return Ok((IRValue::Simple(self.context.i32_type().const_zero().into()), IRType::Simple(self.context.i32_type().into())))
-                            } else {
-                                match self.builder.build_unconditional_branch(merge_bb) {
-                                    Ok(_) => {}
-                                    Err(e) => {
-                                        return Err(format!(
-                                            "something went wrong during `if` codegen. {}",
-                                            e
-                                        ))
-                                    }
-                                };
-                            }
-                        }
+                    let (else_val, _) = self.gen_expression(else_.as_ref().unwrap(), function)?;
+                    if self.builder.get_insert_block().unwrap().get_terminator().is_none() {
+                        self.builder.build_unconditional_branch(merge_bb).unwrap();
                     }
                     else_val.as_basic_enum(self.context)
                 } else {
+                    // Use default if no else block
                     BasicValueEnum::IntValue(self.context.i32_type().const_zero())
-                    // Default value
                 };
 
                 self.builder.position_at_end(merge_bb);
 
-                let phi = self
-                    .builder
-                    .build_phi(
-                        match else_bb {
-                            Some(_) => self.type_to_llvm(type_.clone()).as_basic_enum(self.context),
-                            None => BasicTypeEnum::IntType(self.context.i32_type()),
-                        },
-                        "iftmp",
-                    )
-                    .unwrap();
+                let phi_type = self.type_to_llvm(type_.clone()).as_basic_enum(self.context);
+                let phi = self.builder.build_phi(phi_type, "iftmp").unwrap();
 
-                if let Some(else_bb) = else_bb {
-                    phi.add_incoming(&[
-                        (&then_val.as_basic_enum(self.context), then_bb),
-                        (&else_val, else_bb),
-                    ]);
-                } else {
-                    phi.add_incoming(&[
-                        (&then_val.as_basic_enum(self.context), then_bb),
-                        (&else_val, pre_if_bb),
-                    ]);
-                };
+                phi.add_incoming(&[
+                    (&then_val.as_basic_enum(self.context), then_bb),
+                    (&else_val, else_bb.unwrap_or(current_bb)),
+                ]);
 
-                Ok((IRValue::Simple(phi.as_basic_value()), then_ty))
+                Ok((IRValue::Simple(phi.as_basic_value()), ty))
             }
             TypedExpr::BinaryOp(..) => self.gen_binop(expression, function),
             TypedExpr::Call(..) => self.gen_call(expression, function),
@@ -638,7 +540,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         let var_alloca = self
                             .variables
                             .get(&name.to_string())
-                            .unwrap()
+                            .unwrap() // can panic
                             .0
                             .as_basic_enum(self.context)
                             .into_pointer_value();

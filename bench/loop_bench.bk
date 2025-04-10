@@ -1,0 +1,11 @@
+def loop_benchmark(n: int) -> int do
+    let sum = 0
+    let i = 0
+    while i < n then do
+        sum = sum + i
+        i = i + 1
+    end
+    sum
+end
+
+loop_benchmark(100_000_000)
