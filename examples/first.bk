@@ -48,5 +48,3 @@ end
 # push(list, 5, 8, 200)
 
 # count_to_1B(1)
-
-x="a"+1
