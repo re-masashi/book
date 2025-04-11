@@ -238,7 +238,7 @@ impl TypeEnv {
             } => (format!("Unhandled type: {left} vs {right}"), span, file),
         };
 
-        match File::open(&file) {
+        match File::open(file) {
             Ok(file_) => {
                 let reader = BufReader::new(file_);
                 let lines: Vec<String> = reader
