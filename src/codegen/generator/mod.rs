@@ -12,11 +12,15 @@ use inkwell::values::{
 use inkwell::AddressSpace;
 use inkwell::OptimizationLevel;
 use log::debug;
+use owo_colors::OwoColorize;
 
 use std::collections::HashMap;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
+use std::io::BufRead;
+use std::fs::File;
+use std::io::BufReader;
 
 use crate::codegen::{Literal, Type, TypeConstructor, TypedExpr, TypedNode};
 use crate::lexer::tokens::Span;
@@ -587,5 +591,102 @@ fn get_type_from_typed_expr(expr: &TypedExpr) -> Arc<Type> {
         TypedExpr::Tuple(_, ty, ..) => ty.clone(),
         TypedExpr::Assign(_, _, ty, ..) => ty.clone(),
         TypedExpr::Break(..) | TypedExpr::Continue(..) => t_int!(),
+    }
+}
+
+pub fn error(filename: String, span: Span, message: String) {
+    match File::open(&filename) {
+        Ok(file) => {
+            let reader = BufReader::new(file);
+            let lines: Vec<String> = reader
+                .lines()
+                .map(|l| l.expect("Could not read line"))
+                .collect();
+
+            let (start_line, start_col) = span.0;
+            let (end_line, end_col) = span.1;
+
+            // Adjust for 0-based indexing (lines and columns are 1-indexed)
+            let start_line = (start_line - 1) as usize;
+            let start_col = start_col as usize;
+            let end_line = (end_line - 1) as usize;
+            let end_col = end_col as usize;
+
+            // Validate line numbers and columns
+            if start_line >= lines.len()
+                || end_line >= lines.len()
+                || start_col > lines[start_line].len()
+                || end_col > lines[end_line].len()
+            {
+                eprintln!(
+                    "Invalid span: Line or column numbers out of bounds. {:?} {}",
+                    span,
+                    lines.len()
+                );
+                return;
+            }
+
+            // Extract relevant lines
+            let pre_line = if start_line == 0 {
+                Some("".to_string())
+            } else {
+                lines
+                    .get(start_line - 1)
+                    .map(|l| format!("{} | {}", start_line, l))
+            };
+            let current_line = &lines[start_line];
+            let post_line = lines
+                .get(start_line + 1)
+                .map(|l| format!("{} | {}", start_line + 2, l));
+
+            // Create pointy indicators
+            let start_pointy = format!("{:~<width$}^", "", width = start_col + 1);
+            let end_pointy = format!(
+                "{:^<width$}^",
+                "",
+                width = if start_col > end_col {
+                    1
+                } else {
+                    end_col - start_col
+                }
+            );
+            let padding = format!(
+                "{: <width$}  ",
+                "",
+                width = (start_line + 1).ilog10() as usize
+            );
+
+            // Construct the error message
+            let error_message = format!(
+                "\n\
+                 {}\n\
+                 {} | {}\n\
+                 {}{}{}\n\
+                 {}\n\
+                 {}: {}\n\
+                 at line {}:{} in file `{}`.",
+                pre_line.unwrap_or_default().yellow(),
+                (start_line + 1).green(),
+                current_line.yellow(),
+                padding,
+                start_pointy.red(),
+                end_pointy.red(),
+                post_line.unwrap_or_default().yellow(),
+                "[Syntax Error]".red(),
+                message,
+                (start_line + 1).green(),
+                (start_col + 1).green(),
+                filename.green(),
+            );
+
+            eprintln!("{}", error_message);
+        }
+        Err(error) => {
+            eprintln!(
+                "Error: Could not open file: {}. {}",
+                filename.green(),
+                error
+            );
+        }
     }
 }

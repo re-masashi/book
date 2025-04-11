@@ -9,6 +9,9 @@ pub mod typechecker;
 #[cfg(test)]
 pub mod tests;
 
+use std::fs::File;
+use std::io::BufReader;
+use std::io::BufRead;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::iter::zip;
@@ -235,18 +238,89 @@ impl TypeEnv {
             } => (format!("Unhandled type: {left} vs {right}"), span, file),
         };
 
-        println!(
-            "{} at {:?}: 
-            {} 
-            file `{}`",
-            "[TypeError]".red(),
-            span,
-            message,
-            file.green()
-        );
+        match File::open(&file) {
+            Ok(file_) => {
+                let reader = BufReader::new(file_);
+                let lines: Vec<String> = reader
+                    .lines()
+                    .map(|l| l.expect("Could not read line"))
+                    .collect();
+
+                let (start_line, start_col) = span.0;
+                let (end_line, end_col) = span.1;
+
+                // Adjust for 0-based indexing
+                let start_line = (start_line - 1) as usize;
+                let start_col = start_col as usize;
+                let end_line = (end_line - 1) as usize;
+                let end_col = end_col as usize;
+
+                // Validate line numbers
+                if start_line >= lines.len() || end_line >= lines.len() ||
+                   start_col > lines[start_line].len() || end_col > lines[end_line].len() {
+                    eprintln!("Invalid span: {:?} in file {}", span, file);
+                    return;
+                }
+
+                // Get context lines
+                let pre_line = if start_line > 0 {
+                    lines.get(start_line - 1).map(|l| format!("{} | {}", start_line, l))
+                } else {
+                    None
+                };
+                
+                let current_line = &lines[start_line];
+                let post_line = lines.get(start_line + 1);
+
+                // Create error pointer
+                let pointer = format!(
+                    "{}{}",
+                    " ".repeat(start_col),
+                    "^".repeat(if end_col < start_col { end_col } else {end_col - start_col + 1}).red()
+                );
+
+                // Build error message
+                let mut error_output = format!(
+                    "\n{}: {}\n",
+                    "[Type Error]".red().bold(),
+                    message.bold()
+                );
+
+                if let Some(pre) = pre_line {
+                    error_output.push_str(&format!("{}\n", pre.dimmed()));
+                }
+
+                error_output.push_str(&format!(
+                    "{} | {}\n {}\n",
+                    (start_line + 1).to_string().green().bold(),
+                    current_line,
+                    pointer
+                ));
+
+                if let Some(post) = post_line {
+                    error_output.push_str(&format!("{} | {}\n", (start_line + 2).green().bold(), post.dimmed()));
+                }
+
+                error_output.push_str(&format!(
+                    "\nIn file: {}:{}:{}\n",
+                    file.green(),
+                    start_line ,
+                    start_col
+                ));
+
+                eprintln!("{}", error_output);
+            }
+            Err(e) => {
+                eprintln!(
+                    "{} Failed to open file {}: {}",
+                    "[Error]".red(),
+                    file.green(),
+                    e
+                );
+            }
+        }
     }
 }
-
 #[derive(Debug, Clone)]
 pub enum Node<'a> {
     Function(

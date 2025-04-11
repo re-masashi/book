@@ -65,3 +65,8 @@ DD/MM/YYYY
 
 ## 11/12/2024
 	- fixed an issue where a ptr was passed instead of a struct in function args
+
+## (After several updates) 12/4/25
+	- Reverted dynamic arrays
+	- All arrays are dynamic now
+	- Minor bug fixes
