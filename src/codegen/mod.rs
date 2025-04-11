@@ -9,11 +9,11 @@ pub mod typechecker;
 #[cfg(test)]
 pub mod tests;
 
-use std::fs::File;
-use std::io::BufReader;
-use std::io::BufRead;
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::BufRead;
+use std::io::BufReader;
 use std::iter::zip;
 use std::sync::Arc;
 
@@ -256,19 +256,24 @@ impl TypeEnv {
                 let end_col = end_col as usize;
 
                 // Validate line numbers
-                if start_line >= lines.len() || end_line >= lines.len() ||
-                   start_col > lines[start_line].len() || end_col > lines[end_line].len() {
+                if start_line >= lines.len()
+                    || end_line >= lines.len()
+                    || start_col > lines[start_line].len()
+                    || end_col > lines[end_line].len()
+                {
                     eprintln!("Invalid span: {:?} in file {}", span, file);
                     return;
                 }
 
                 // Get context lines
                 let pre_line = if start_line > 0 {
-                    lines.get(start_line - 1).map(|l| format!("{} | {}", start_line, l))
+                    lines
+                        .get(start_line - 1)
+                        .map(|l| format!("{} | {}", start_line, l))
                 } else {
                     None
                 };
-                
+
                 let current_line = &lines[start_line];
                 let post_line = lines.get(start_line + 1);
 
@@ -276,15 +281,17 @@ impl TypeEnv {
                 let pointer = format!(
                     "{}{}",
                     " ".repeat(start_col),
-                    "^".repeat(if end_col < start_col { end_col } else {end_col - start_col + 1}).red()
+                    "^".repeat(if end_col < start_col {
+                        end_col
+                    } else {
+                        end_col - start_col + 1
+                    })
+                    .red()
                 );
 
                 // Build error message
-                let mut error_output = format!(
-                    "\n{}: {}\n",
-                    "[Type Error]".red().bold(),
-                    message.bold()
-                );
+                let mut error_output =
+                    format!("\n{}: {}\n", "[Type Error]".red().bold(), message.bold());
 
                 if let Some(pre) = pre_line {
                     error_output.push_str(&format!("{}\n", pre.dimmed()));
@@ -298,13 +305,17 @@ impl TypeEnv {
                 ));
 
                 if let Some(post) = post_line {
-                    error_output.push_str(&format!("{} | {}\n", (start_line + 2).green().bold(), post.dimmed()));
+                    error_output.push_str(&format!(
+                        "{} | {}\n",
+                        (start_line + 2).green().bold(),
+                        post.dimmed()
+                    ));
                 }
 
                 error_output.push_str(&format!(
                     "\nIn file: {}:{}:{}\n",
                     file.green(),
-                    start_line ,
+                    start_line,
                     start_col
                 ));
 

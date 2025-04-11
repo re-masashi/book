@@ -15,12 +15,12 @@ use log::debug;
 use owo_colors::OwoColorize;
 
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::BufRead;
+use std::io::BufReader;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
-use std::io::BufRead;
-use std::fs::File;
-use std::io::BufReader;
 
 use crate::codegen::{Literal, Type, TypeConstructor, TypedExpr, TypedNode};
 use crate::lexer::tokens::Span;
