@@ -60,7 +60,7 @@ jobs:
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v2
+        uses: actions/create-release@v1
         with:
           tag_name: ${{ env.DATE_TAG }}
           release_name: Weekly Build ${{ env.DATE_TAG }}
@@ -70,7 +70,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Binary Asset
-        uses: actions/upload-release-asset@v2
+        uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./release/book
@@ -84,7 +84,7 @@ jobs:
           zip -j ./dist/book-${{ env.DATE_TAG }}.zip ./dist/book-${{ env.DATE_TAG }}
 
       - name: Upload Zip Asset
-        uses: actions/upload-release-asset@v2
+        uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
           asset_path: ./dist/book-${{ env.DATE_TAG }}.zip
