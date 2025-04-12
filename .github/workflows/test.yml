@@ -6,29 +6,19 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 0 * * *'  # Runs daily at midnight UTC
+    - cron: '0 0 * * 0'  # Weekly every Sunday at midnight UTC
 
 jobs:
   style:
     name: Style Check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
         with:
-          profile: minimal
           toolchain: stable
-          override: true
           components: rustfmt
-
-      - name: cargo fmt --check
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - run: cargo fmt --all -- --check
 
   build:
     runs-on: ubuntu-latest
@@ -40,55 +30,61 @@ jobs:
           sudo ./llvm.sh 18
 
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1  
-
+      - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - name: Clippy
-        run: rustup component add clippy && cargo clippy -- -D warnings
-      - name: Build
-        run: cargo build --release
-      - name: Test
-        run: cargo test --release
-      - uses: actions/upload-artifact@v4
+      - run: rustup component add clippy
+      - run: cargo clippy -- -D warnings
+      - run: cargo build --release
+      - run: cargo test --release
+      - name: Upload Binary
+        uses: actions/upload-artifact@v4
         with:
-          name: release-artifact
-          path: target/release
+          name: lyronc-bin
+          path: target/release/lyronc  # Direct path to compiled binary
 
   release:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Set Date Env
-        id: date
-        run: echo "DATE_TAG=nightly-$(date +'%Y-%m-%d')" >> $GITHUB_ENV
+      - name: Set Weekly Tag
+        run: echo "DATE_TAG=weekly-$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
-      - name: Download Release Artifact
+      - name: Download Binary
         uses: actions/download-artifact@v4
         with:
-          name: release-artifact
+          name: lyronc-bin
           path: ./release
 
-      - name: Create Nightly Release
+      - name: Create Release
         id: create_release
         uses: actions/create-release@v1
         with:
           tag_name: ${{ env.DATE_TAG }}
-          release_name: Nightly Build ${{ env.DATE_TAG }}
+          release_name: Weekly Build ${{ env.DATE_TAG }}
           draft: false
           prerelease: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Release Asset
+      - name: Upload Binary Asset
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/lyronc  
-          asset_name: lyronc            
+          asset_path: ./release/lyronc
+          asset_name: lyronc-${{ env.DATE_TAG }}
           asset_content_type: application/octet-stream
 
-      - name: Zip Binary
+      - name: Create Zip Package
         run: |
-          cd release
-          zip lyronc-${{ env.DATE_TAG }}.zip lyronc
+          mkdir -p dist
+          cp ./release/lyronc ./dist/lyronc-${{ env.DATE_TAG }}
+          zip -j ./dist/lyronc-${{ env.DATE_TAG }}.zip ./dist/lyronc-${{ env.DATE_TAG }}
+
+      - name: Upload Zip Asset
+        uses: actions/upload-release-asset@v1
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: ./dist/lyronc-${{ env.DATE_TAG }}.zip
+          asset_name: lyronc-${{ env.DATE_TAG }}.zip
+          asset_content_type: application/zip
