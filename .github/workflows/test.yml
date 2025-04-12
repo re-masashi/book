@@ -1,19 +1,19 @@
 name: Test and Release
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
   schedule:
-    - cron: '0 0 * * 0'  # Weekly every Sunday at midnight UTC
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC
+  workflow_dispatch:      # Allow manual triggers
+
+permissions:
+  contents: write
 
 jobs:
   style:
     name: Style Check
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -29,7 +29,7 @@ jobs:
           chmod +x llvm.sh
           sudo ./llvm.sh 18
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -37,56 +37,44 @@ jobs:
       - run: cargo clippy -- -D warnings
       - run: cargo build --release
       - run: cargo test --release
-      - name: Upload Binary
+      
+      - name: Upload Binary Artifact
         uses: actions/upload-artifact@v4
         with:
           name: book-bin
-          path: target/release/book  # Direct path to compiled binary
+          path: target/release/book
 
   release:
-    needs: build
+    needs: [build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      
     steps:
-      - name: Set Weekly Tag
+      - name: Get Weekly Tag
         run: echo "DATE_TAG=weekly-$(date +'%Y-%m-%d')" >> $GITHUB_ENV
 
-      - name: Download Binary
+      - name: Download Built Binary
         uses: actions/download-artifact@v4
         with:
           name: book-bin
-          path: ./release
+          path: release
 
       - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        with:
-          tag_name: ${{ env.DATE_TAG }}
-          release_name: Weekly Build ${{ env.DATE_TAG }}
-          draft: false
-          prerelease: true
+        run: |
+          gh release create ${{ env.DATE_TAG }} \
+            --title "Weekly Release ${{ env.DATE_TAG }}" \
+            --notes "Automated weekly build" \
+            --prerelease
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Binary Asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/book
-          asset_name: book-${{ env.DATE_TAG }}
-          asset_content_type: application/octet-stream
-
-      - name: Create Zip Package
+      - name: Upload Binary Assets
         run: |
-          mkdir -p dist
-          cp ./release/book ./dist/book-${{ env.DATE_TAG }}
-          zip -j ./dist/book-${{ env.DATE_TAG }}.zip ./dist/book-${{ env.DATE_TAG }}
-
-      - name: Upload Zip Asset
-        uses: actions/upload-release-asset@v1
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/book-${{ env.DATE_TAG }}.zip
-          asset_name: book-${{ env.DATE_TAG }}.zip
-          asset_content_type: application/zip
+          cd release
+          zip -r book-${{ env.DATE_TAG }}.zip book
+          gh release upload ${{ env.DATE_TAG }} \
+            book \
+            book-${{ env.DATE_TAG }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
