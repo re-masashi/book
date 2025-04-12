@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC
+    - cron: '0 0 * * 0'  # Weekly every Sunday at midnight UTC
 
 jobs:
   style:
@@ -37,17 +37,11 @@ jobs:
       - run: cargo clippy -- -D warnings
       - run: cargo build --release
       - run: cargo test --release
-      
-      - name: Verify Binary Exists
-        run: |
-          ls -la target/release
-          test -f target/release/lyronc || exit 1
-          
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
-          name: lyronc-bin
-          path: target/release/lyronc
+          name: book-bin
+          path: target/release/book  # Direct path to compiled binary
 
   release:
     needs: build
@@ -59,13 +53,8 @@ jobs:
       - name: Download Binary
         uses: actions/download-artifact@v4
         with:
-          name: lyronc-bin
+          name: book-bin
           path: ./release
-
-      - name: Verify Downloaded Binary
-        run: |
-          ls -la ./release
-          test -f ./release/lyronc || exit 1
 
       - name: Create Release
         id: create_release
@@ -82,20 +71,20 @@ jobs:
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./release/lyronc
-          asset_name: lyronc-${{ env.DATE_TAG }}
+          asset_path: ./release/book
+          asset_name: book-${{ env.DATE_TAG }}
           asset_content_type: application/octet-stream
 
       - name: Create Zip Package
         run: |
           mkdir -p dist
-          cp ./release/lyronc ./dist/
-          zip -j ./dist/lyronc-${{ env.DATE_TAG }}.zip ./dist/lyronc
+          cp ./release/book ./dist/book-${{ env.DATE_TAG }}
+          zip -j ./dist/book-${{ env.DATE_TAG }}.zip ./dist/book-${{ env.DATE_TAG }}
 
       - name: Upload Zip Asset
         uses: actions/upload-release-asset@v1
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/lyronc-${{ env.DATE_TAG }}.zip
-          asset_name: lyronc-${{ env.DATE_TAG }}.zip
+          asset_path: ./dist/book-${{ env.DATE_TAG }}.zip
+          asset_name: book-${{ env.DATE_TAG }}.zip
           asset_content_type: application/zip
