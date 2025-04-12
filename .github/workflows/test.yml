@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
   schedule:
-    - cron: '0 0 * * 0'  # Weekly every Sunday at midnight UTC
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight UTC
 
 jobs:
   style:
@@ -37,11 +37,17 @@ jobs:
       - run: cargo clippy -- -D warnings
       - run: cargo build --release
       - run: cargo test --release
+      
+      - name: Verify Binary Exists
+        run: |
+          ls -la target/release
+          test -f target/release/lyronc || exit 1
+          
       - name: Upload Binary
         uses: actions/upload-artifact@v4
         with:
           name: lyronc-bin
-          path: target/release/lyronc  # Direct path to compiled binary
+          path: target/release/lyronc
 
   release:
     needs: build
@@ -55,6 +61,11 @@ jobs:
         with:
           name: lyronc-bin
           path: ./release
+
+      - name: Verify Downloaded Binary
+        run: |
+          ls -la ./release
+          test -f ./release/lyronc || exit 1
 
       - name: Create Release
         id: create_release
@@ -78,8 +89,8 @@ jobs:
       - name: Create Zip Package
         run: |
           mkdir -p dist
-          cp ./release/lyronc ./dist/lyronc-${{ env.DATE_TAG }}
-          zip -j ./dist/lyronc-${{ env.DATE_TAG }}.zip ./dist/lyronc-${{ env.DATE_TAG }}
+          cp ./release/lyronc ./dist/
+          zip -j ./dist/lyronc-${{ env.DATE_TAG }}.zip ./dist/lyronc
 
       - name: Upload Zip Asset
         uses: actions/upload-release-asset@v1
