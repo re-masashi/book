@@ -1,5 +1,5 @@
-use std::io::Write;
 use std::fs::{self, File};
+use std::io::Write;
 use std::process::Command;
 
 use serde::{Deserialize, Serialize};
@@ -34,8 +34,7 @@ pub fn init_package(name: &str) -> std::io::Result<()> {
     fs::create_dir_all(format!("{}/src", name))?;
 
     let main_path = format!("{}/src/main.bk", name);
-    File::create(main_path)?
-        .write_all(b"println(\"Hello, world!\")\n")?;
+    File::create(main_path)?.write_all(b"println(\"Hello, world!\")\n")?;
 
     let pkg = BkPackage {
         name: name.to_string(),

@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand, arg};
+use clap::{arg, Parser, Subcommand};
 use std::path::PathBuf;
 
 pub mod codegen;
@@ -39,14 +39,21 @@ pub struct Cli {
 #[derive(Subcommand)]
 pub enum Commands {
     /// builds and runs a file
-    Run { file: String },
+    Run {
+        file: String,
+    },
     /// builds a file
-    Build { file: String },
-    Init { name: String },
+    Build {
+        file: String,
+    },
+    Init {
+        name: String,
+    },
     Install {
         name: String,
         #[arg(long)]
         git: String,
         #[arg(long, default_value = "0.1.0")]
         version: String,
-    },}
+    },
+}

@@ -15,7 +15,7 @@ use log::debug;
 use owo_colors::OwoColorize;
 
 use std::collections::HashMap;
-use std::fs::{File};
+use std::fs::File;
 use std::io::BufRead;
 use std::io::BufReader;
 use std::path::Path;
@@ -33,8 +33,8 @@ pub mod gen_call;
 
 macro_rules! _write_std_cc {
     () => {{
-        let project_root = env::var("CARGO_MANIFEST_DIR").unwrap();  // Get project root path
-        let std_cc_path = Path::new(&project_root).join("src/std.cc");  // Get std.cc path
+        let project_root = env::var("CARGO_MANIFEST_DIR").unwrap(); // Get project root path
+        let std_cc_path = Path::new(&project_root).join("src/std.cc"); // Get std.cc path
 
         // Create a temp file to write std.cc contents
         let temp_file = NamedTempFile::new().unwrap();
@@ -524,10 +524,9 @@ impl<'ctx> IRGenerator<'ctx> {
             .output()
             .expect("failed to execute process");
 
-
         if !result.status.success() {
             eprintln!("Build failed: {:?}", result);
-            return Err("build failed".to_string())
+            return Err("build failed".to_string());
         }
 
         Ok(())

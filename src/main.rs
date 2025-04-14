@@ -1,9 +1,9 @@
 use book::{
+    bkpm,
     codegen::{generator::IRGenerator, TypeEnv},
     lexer::{tokens::Span, tokens::Token, tokens::TokenType, Lexer},
     parser::Parser,
     Cli, Commands,
-    bkpm,
 };
 use log::{trace, LevelFilter};
 use owo_colors::OwoColorize;
