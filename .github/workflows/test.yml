@@ -47,38 +47,3 @@ jobs:
         with:
           name: book-bin
           path: target/release/book
-
-  release:
-    needs: [build]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      
-    steps:
-      - name: Get Weekly Tag
-        run: echo "DATE_TAG=weekly-$(date +'%Y-%m-%d')" >> $GITHUB_ENV
-
-      - name: Download Built Binary
-        uses: actions/download-artifact@v4
-        with:
-          name: book-bin
-          path: release
-
-      - name: Create Release
-        run: |
-          gh release create ${{ env.DATE_TAG }} \
-            --title "Weekly Release ${{ env.DATE_TAG }}" \
-            --notes "Automated weekly build" \
-            --prerelease
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Upload Binary Assets
-        run: |
-          cd release
-          zip -r book-${{ env.DATE_TAG }}.zip book
-          gh release upload ${{ env.DATE_TAG }} \
-            book \
-            book-${{ env.DATE_TAG }}.zip
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
