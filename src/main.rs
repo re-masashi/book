@@ -3,6 +3,7 @@ use book::{
     lexer::{tokens::Span, tokens::Token, tokens::TokenType, Lexer},
     parser::Parser,
     Cli, Commands,
+    bkpm,
 };
 use log::{trace, LevelFilter};
 use owo_colors::OwoColorize;
@@ -40,6 +41,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         Commands::Build { file } => {
             build_file(file, optimisation_level)?;
+        }
+        Commands::Init { name } => {
+            bkpm::init_package(name)?;
+        }
+        Commands::Install { name, git, version } => {
+            bkpm::install_dependency(name, git, version)?;
         }
     }
 

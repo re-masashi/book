@@ -15,7 +15,7 @@ use log::debug;
 use owo_colors::OwoColorize;
 
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{File};
 use std::io::BufRead;
 use std::io::BufReader;
 use std::path::Path;
@@ -30,6 +30,23 @@ pub mod expression;
 pub mod function;
 pub mod gen_binop;
 pub mod gen_call;
+
+macro_rules! _write_std_cc {
+    () => {{
+        let project_root = env::var("CARGO_MANIFEST_DIR").unwrap();  // Get project root path
+        let std_cc_path = Path::new(&project_root).join("src/std.cc");  // Get std.cc path
+
+        // Create a temp file to write std.cc contents
+        let temp_file = NamedTempFile::new().unwrap();
+        let temp_path = temp_file.path().to_str().unwrap().to_string();
+
+        // Copy std.cc contents to the temp file
+        let std_cc_contents = std::fs::read_to_string(std_cc_path).unwrap();
+        write(&temp_path, std_cc_contents).unwrap();
+
+        temp_path
+    }};
+}
 
 pub struct IRGenerator<'ctx> {
     context: &'ctx Context,
@@ -493,12 +510,12 @@ impl<'ctx> IRGenerator<'ctx> {
         assert!(target_machine
             .write_to_file(&self.module, FileType::Object, path)
             .is_ok());
-        // println!("{:#?}\n====", node);
-        Command::new("gcc") // todo: make this better
+
+        let result = Command::new("gcc") // todo: make this better
             .args([
                 "-O3",
                 &(binding),
-                "std.cc",
+                "std.cc", // todo: make this normal
                 "-o",
                 exec_name,
                 "-I/usr/lib/gc",
@@ -506,6 +523,12 @@ impl<'ctx> IRGenerator<'ctx> {
             ])
             .output()
             .expect("failed to execute process");
+
+
+        if !result.status.success() {
+            eprintln!("Build failed: {:?}", result);
+            return Err("build failed".to_string())
+        }
 
         Ok(())
     }

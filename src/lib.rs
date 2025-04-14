@@ -1,9 +1,11 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, arg};
 use std::path::PathBuf;
 
 pub mod codegen;
 pub mod lexer;
 pub mod parser;
+
+pub mod bkpm;
 
 pub type Result<T> = std::result::Result<T, String>;
 
@@ -40,4 +42,11 @@ pub enum Commands {
     Run { file: String },
     /// builds a file
     Build { file: String },
-}
+    Init { name: String },
+    Install {
+        name: String,
+        #[arg(long)]
+        git: String,
+        #[arg(long, default_value = "0.1.0")]
+        version: String,
+    },}
