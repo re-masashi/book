@@ -77,7 +77,6 @@ name = "book"
 version = "0.1.0"
 dependencies = [
  "clap",
- "env",
  "env_logger",
  "inkwell",
  "log",
@@ -153,15 +152,6 @@ name = "either"
 version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "60b1af1c220855b6ceac025d3f6ecdd2b7c4894bfe9cd9bda4fbb4bc7c0d4cf0"
-
-[[package]]
-name = "env"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bc95de49ad098572c02d3fbf368c9a020bfff5ae78483685b77f51d8a7e9486d"
-dependencies = [
- "num_threads",
-]
 
 [[package]]
 name = "env_filter"
@@ -251,7 +241,7 @@ dependencies = [
 [[package]]
 name = "inkwell"
 version = "0.5.0"
-source = "git+https://github.com/TheDan64/inkwell?branch=master#e1a5c2f8ed0ddab3a84cb9f92f69bbd57f70db49"
+source = "git+https://github.com/TheDan64/inkwell?branch=master#129aa8dbd1c64a814ff4874dbad02f4ec638e104"
 dependencies = [
  "either",
  "inkwell_internals",
@@ -264,7 +254,7 @@ dependencies = [
 [[package]]
 name = "inkwell_internals"
 version = "0.10.0"
-source = "git+https://github.com/TheDan64/inkwell?branch=master#e1a5c2f8ed0ddab3a84cb9f92f69bbd57f70db49"
+source = "git+https://github.com/TheDan64/inkwell?branch=master#129aa8dbd1c64a814ff4874dbad02f4ec638e104"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -320,15 +310,6 @@ name = "memchr"
 version = "2.7.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "78ca9ab1a0babb1e7d5695e3530886289c18cf2f87ec19a575a0abdce112e3a3"
-
-[[package]]
-name = "num_threads"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c7398b9c8b70908f6371f47ed36737907c87c52af34c268fed0bf0ceb92ead9"
-dependencies = [
- "libc",
-]
 
 [[package]]
 name = "once_cell"
