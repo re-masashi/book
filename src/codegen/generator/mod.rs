@@ -21,6 +21,7 @@ use std::io::BufReader;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
+use std::env;
 
 use crate::codegen::{Literal, Type, TypeConstructor, TypedExpr, TypedNode};
 use crate::lexer::tokens::Span;
@@ -506,16 +507,19 @@ impl<'ctx> IRGenerator<'ctx> {
 
         let exec_name = &(self.file.clone()[..=self.file.len() - 4].to_string() + ".out");
         // println!("emitting {:?}. binding {:?}", exec_name, binding);
-
+        
         assert!(target_machine
             .write_to_file(&self.module, FileType::Object, path)
             .is_ok());
-
+        
+        // Get the value of the environment variable or use "std.cc" as a default
+        let stdlib_path = env::var("BOOK_STDLIB_PATH").unwrap_or_else(|_| "std.cc".to_string());
+        
         let result = Command::new("gcc") // todo: make this better
             .args([
                 "-O3",
                 &(binding),
-                "std.cc", // todo: make this normal
+                &stdlib_path, // Use the resolved path here
                 "-o",
                 exec_name,
                 "-I/usr/lib/gc",
@@ -523,11 +527,11 @@ impl<'ctx> IRGenerator<'ctx> {
             ])
             .output()
             .expect("failed to execute process");
-
+        
         if !result.status.success() {
             eprintln!("Build failed: {:?}", result);
             return Err("build failed".to_string());
-        }
+        }        
 
         Ok(())
     }
