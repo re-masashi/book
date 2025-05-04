@@ -73,3 +73,8 @@ DD/MM/YYYY
 
 # 12/4/25
 	- added better type error and codegen error reporting
+
+# 5/5/25
+	- Renamed book/ to doc/ to avoid confusion.
+	- Added a README.md
+	- Added a license
