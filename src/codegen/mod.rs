@@ -474,7 +474,7 @@ pub enum Type {
     Variable(TypeVariable),
     Trait(String), // a specified trait bound
     Function(Vec<Arc<Type>>, Arc<Type>),
-    Struct(String, Vec<String>, Vec<(String, Arc<Type>)>),
+    Struct(String, Vec<Arc<Type>>, Vec<(String, Arc<Type>)>),
     Tuple(Vec<Arc<Type>>),
 }
 
@@ -568,6 +568,8 @@ pub enum TypeError {
         file: String,
     },
 }
+
+type UnifyResult = Result<(), TypeError>;
 
 fn unify(
     left: Arc<Type>,

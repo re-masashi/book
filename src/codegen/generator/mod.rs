@@ -62,12 +62,18 @@ pub struct IRGenerator<'ctx> {
     polymorphic_functions: HashMap<String, Vec<PolyMorphicFunction<'ctx>>>,
     builtins: Vec<IRValue<'ctx>>,
     loop_bbs: Option<(BasicBlock<'ctx>, BasicBlock<'ctx>)>,
+    generic_structs: HashMap<String, (Vec<String>, Vec<(String, Arc<Type>)>)>,
 }
 
 pub struct PolyMorphicFunction<'ctx>(
     Vec<Arc<Type>>, // args
     Arc<Type>,      // ret
     IRValue<'ctx>,
+    IRType<'ctx>,
+);
+
+pub struct PolyMorphicStruct<'ctx>(
+    Vec<Arc<Type>>, // args
     IRType<'ctx>,
 );
 
@@ -173,6 +179,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 IRValue::BuiltIn("set".to_string()),
             ],
             loop_bbs: None,
+            generic_structs: HashMap::new(),
         }
     }
 
@@ -227,6 +234,7 @@ impl<'ctx> IRGenerator<'ctx> {
             .fn_type(&[self.context.ptr_type(AddressSpace::from(0)).into()], true);
         let _print_func = self.module.add_function("printf", printf_type, None);
     }
+
 
     pub fn gen_program(
         &mut self,
@@ -323,128 +331,134 @@ impl<'ctx> IRGenerator<'ctx> {
                         TypedNode::Extern(name, args, ret) => {
                             self.gen_extern(name.to_string(), args.to_vec(), ret.clone())?;
                         }
-                        TypedNode::Struct(name, _generics, fields) => {
-                            let mut arg_types = vec![];
-                            let mut field_types = vec![];
-                            let mut field_metadata_types = vec![];
+                        TypedNode::Struct(name, generics, fields) => {
+                            let generic_params: Vec<String> = generics.iter().map(|g| g.to_string()).collect();
+                            let field_types: Vec<(String, Arc<Type>)> = fields.clone().iter()
+                                .map(|(fname, ftype)| (fname.to_string(), ftype.clone()))
+                                .collect();
+                            self.generic_structs.insert(name.to_string(), (generic_params, field_types));
+                            println!("structs {:#?}", self.generic_structs);
+                            // let mut arg_types = vec![];
+                            // let mut field_types = vec![];
+                            // let mut field_metadata_types = vec![];
 
-                            let malloc_func = self
-                                .module
-                                .get_function("GC_malloc")
-                                .expect("malloc not found");
+                            // let malloc_func = self
+                            //     .module
+                            //     .get_function("GC_malloc")
+                            //     .expect("malloc not found");
 
-                            for (name, field_type) in fields {
-                                arg_types.push((
-                                    name.to_string(),
-                                    self.type_to_llvm(field_type.clone()),
-                                ));
-                                field_types.push(
-                                    self.type_to_llvm(field_type.clone())
-                                        .as_basic_enum(self.context),
-                                );
-                                field_metadata_types.push(
-                                    self.type_to_llvm(field_type.clone())
-                                        .as_meta_enum(self.context),
-                                );
-                            }
-                            // println!("");
+                            // for (fname, field_type) in fields {
+                            //     arg_types.push((
+                            //         fname.to_string(),
+                            //         self.type_to_llvm(field_type.clone()),
+                            //     ));
+                            //     field_types.push(
+                            //         self.type_to_llvm(field_type.clone())
+                            //             .as_basic_enum(self.context),
+                            //     );
+                            //     field_metadata_types.push(
+                            //         self.type_to_llvm(field_type.clone())
+                            //             .as_meta_enum(self.context),
+                            //     );
+                            // }
+                            // // println!("");
 
-                            let struct_type = self.context.struct_type(&field_types, false);
-                            let struct_size = struct_type.size_of().unwrap();
+                            // let struct_type = self.context.struct_type(&field_types, false);
+                            // let struct_size = struct_type.size_of().unwrap();
 
-                            let function_type = self
-                                .context
-                                .ptr_type(inkwell::AddressSpace::from(0))
-                                .fn_type(&field_metadata_types, false);
-                            let function = self.module.add_function(
-                                &("create_".to_string() + name),
-                                function_type,
-                                None,
-                            );
+                            // let function_type = self
+                            //     .context
+                            //     .ptr_type(inkwell::AddressSpace::from(0))
+                            //     .fn_type(&field_metadata_types, false);
+                            // let function = self.module.add_function(
+                            //     &("create_".to_string() + name),
+                            //     function_type,
+                            //     None,
+                            // );
 
-                            let entry_block = self.context.append_basic_block(function, "entry");
-                            self.builder.position_at_end(entry_block);
+                            // let entry_block = self.context.append_basic_block(function, "entry");
+                            // self.builder.position_at_end(entry_block);
 
-                            // let struct_ptr = self.builder.build_alloca(struct_type.clone(), "struct_ptr").unwrap();
-                            let struct_ptr = self
-                                .builder
-                                .build_call(malloc_func, &[struct_size.into()], "struct_ptr")
-                                .unwrap()
-                                .try_as_basic_value()
-                                .left()
-                                .unwrap()
-                                .into_pointer_value();
+                            // // let struct_ptr = self.builder.build_alloca(struct_type.clone(), "struct_ptr").unwrap();
+                            // let struct_ptr = self
+                            //     .builder
+                            //     .build_call(malloc_func, &[struct_size.into()], "struct_ptr")
+                            //     .unwrap()
+                            //     .try_as_basic_value()
+                            //     .left()
+                            //     .unwrap()
+                            //     .into_pointer_value();
 
-                            for (i, (field_name, _field_type)) in fields.iter().enumerate() {
-                                let field_ptr = unsafe {
-                                    self.builder
-                                        .build_gep(
-                                            struct_type,
-                                            struct_ptr,
-                                            &[
-                                                self.context.i32_type().const_zero(),
-                                                self.context.i32_type().const_int(i as u64, false),
-                                            ],
-                                            field_name,
-                                        )
-                                        .unwrap()
-                                };
+                            // for (i, (field_name, _field_type)) in fields.iter().enumerate() {
+                            //     let field_ptr = unsafe {
+                            //         self.builder
+                            //             .build_gep(
+                            //                 struct_type,
+                            //                 struct_ptr,
+                            //                 &[
+                            //                     self.context.i32_type().const_zero(),
+                            //                     self.context.i32_type().const_int(i as u64, false),
+                            //                 ],
+                            //                 field_name,
+                            //             )
+                            //             .unwrap()
+                            //     };
 
-                                let field_value = function.get_nth_param(i as u32).unwrap();
-                                self.builder.build_store(field_ptr, field_value).unwrap();
-                            }
+                            //     let field_value = function.get_nth_param(i as u32).unwrap();
+                            //     self.builder.build_store(field_ptr, field_value).unwrap();
+                            // }
 
-                            self.builder.build_return(Some(&struct_ptr)).unwrap();
+                            // self.builder.build_return(Some(&struct_ptr)).unwrap();
 
-                            self.structs.insert(
-                                name.to_string(),
-                                (
-                                    struct_type,
-                                    fields
-                                        .iter()
-                                        .map(|(name, ty)| {
-                                            (name.to_string(), self.type_to_llvm(ty.clone()))
-                                        })
-                                        .collect(),
-                                ),
-                            );
-                            self.variables.insert(
-                                name.to_string(),
-                                (
-                                    IRValue::Function(
-                                        function,
-                                        arg_types.clone(),
-                                        Box::new(IRType::Struct(
-                                            struct_type,
-                                            fields
-                                                .iter()
-                                                .map(|(name, ty)| {
-                                                    (
-                                                        name.to_string(),
-                                                        self.type_to_llvm(ty.clone()),
-                                                    )
-                                                })
-                                                .collect(),
-                                        )),
-                                    ),
-                                    IRType::Function(
-                                        // function,
-                                        arg_types,
-                                        Box::new(IRType::Struct(
-                                            struct_type,
-                                            fields
-                                                .iter()
-                                                .map(|(name, ty)| {
-                                                    (
-                                                        name.to_string(),
-                                                        self.type_to_llvm(ty.clone()),
-                                                    )
-                                                })
-                                                .collect(),
-                                        )),
-                                    ),
-                                ),
-                            );
+                            // self.structs.insert(
+                            //     name.to_string(),
+                            //     (
+                            //         struct_type,
+                            //         fields
+                            //             .iter()
+                            //             .map(|(name, ty)| {
+                            //                 (name.to_string(), self.type_to_llvm(ty.clone()))
+                            //             })
+                            //             .collect(),
+                            //     ),
+                            // );
+                            // self.variables.insert(
+                            //     name.to_string(),
+                            //     (
+                            //         IRValue::Function(
+                            //             function,
+                            //             arg_types.clone(),
+                            //             Box::new(IRType::Struct(
+                            //                 struct_type,
+                            //                 fields
+                            //                     .iter()
+                            //                     .map(|(name, ty)| {
+                            //                         (
+                            //                             name.to_string(),
+                            //                             self.type_to_llvm(ty.clone()),
+                            //                         )
+                            //                     })
+                            //                     .collect(),
+                            //             )),
+                            //         ),
+                            //         IRType::Function(
+                            //             // function,
+                            //             arg_types,
+                            //             Box::new(IRType::Struct(
+                            //                 struct_type,
+                            //                 fields
+                            //                     .iter()
+                            //                     .map(|(name, ty)| {
+                            //                         (
+                            //                             name.to_string(),
+                            //                             self.type_to_llvm(ty.clone()),
+                            //                         )
+                            //                     })
+                            //                     .collect(),
+                            //             )),
+                            //         ),
+                            //     ),
+                            // );
                         }
                         _ => unreachable!(),
                     }
@@ -593,7 +607,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 }
                 // IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into())
             }
-            _ => panic!("{:?}", ty),
+            _ => panic!("Type to llvm not possible for {:?}", ty),
         }
     }
 }
@@ -698,7 +712,7 @@ pub fn error(filename: String, span: Span, message: String) {
                 start_pointy.red(),
                 end_pointy.red(),
                 post_line.unwrap_or_default().yellow(),
-                "[Syntax Error]".red(),
+                "[Codegen Error]".red(),
                 message,
                 (start_line + 1).green(),
                 (start_col + 1).green(),

@@ -871,116 +871,63 @@ impl<'a> TypeEnv {
                 TypedNode::Program(nodes_)
             }
             Node::Struct(name, generics, fields) => {
-                self.0.insert(
-                    name.to_string(),
-                    Type::Function(
-                        fields
-                            .iter()
-                            .map(|(_name, ty)| {
-                                Type::Constructor(TypeConstructor {
-                                    name: ty.name.to_string(),
-                                    generics: ty
-                                        .generics
-                                        .clone()
-                                        .into_iter()
-                                        .map(|generic| {
-                                            if generics
-                                                .contains(&std::borrow::Cow::Borrowed(&generic))
-                                            {
-                                                tvar!(self.0.len() + 1)
-                                            } else {
-                                                tconst!(generic)
-                                            }
-                                        })
-                                        .collect(),
-                                    traits: vec![],
-                                })
-                                .into()
-                            })
-                            .collect::<Vec<_>>(),
-                        Type::Constructor(TypeConstructor {
-                            name: name.to_string(),
-                            generics: generics
-                                .clone()
-                                .into_iter()
-                                .map(|generic| {
-                                    if generics.contains(&std::borrow::Cow::Borrowed(&generic)) {
-                                        tvar!(self.0.len() + 1)
-                                    } else {
-                                        tconst!(generic)
-                                    }
-                                })
-                                .collect(),
-                            traits: vec![],
-                        })
-                        .into(),
-                    )
-                    .into(),
+                // Create fresh type variables for each generic parameter
+                let type_vars: Vec<Arc<Type>> =
+                    generics.iter().map(|_| tvar!(self.0.len() + 1)).collect();
+
+                // Map generic names to their type variables
+                let generic_map: HashMap<&str, Arc<Type>> = generics
+                    .iter()
+                    .zip(type_vars.iter())
+                    .map(|(name, ty)| (name.as_ref(), ty.clone()))
+                    .collect();
+
+                // Process field types with generic substitution
+                let processed_fields = fields
+                    .iter()
+                    .map(|(field_name, field_type)| {
+                        let ty = self.resolve_field_type(field_type, &generic_map, &generics);
+                        (field_name.clone(), ty)
+                    })
+                    .collect::<Vec<_>>();
+
+                // Process field types with generic substitution
+                let processed_fields_string = fields
+                    .iter()
+                    .map(|(field_name, field_type)| {
+                        let ty = self.resolve_field_type(field_type, &generic_map, &generics);
+                        (field_name.to_string(), ty)
+                    })
+                    .collect::<Vec<_>>();
+
+                // Create struct type with type variables
+                let struct_type = Type::Constructor(TypeConstructor {
+                    name: name.to_string(),
+                    generics: type_vars.clone(),
+                    traits: vec![],
+                });
+
+                // Create constructor function type
+                let constructor_type = Type::Function(
+                    processed_fields.iter().map(|(_, ty)| ty.clone()).collect(),
+                    Arc::new(struct_type.clone()),
                 );
+
+                // Register in type environment
+                self.0.insert(name.to_string(), Arc::new(constructor_type));
                 self.1.insert(
                     name.to_string(),
                     (
                         name.to_string(),
-                        generics.iter().map(|n| n.to_string()).collect(),
-                        fields
-                            .iter()
-                            .map(|(name, ty)| {
-                                (
-                                    name.to_string(),
-                                    Type::Constructor(TypeConstructor {
-                                        name: ty.name.to_string(),
-                                        generics: ty
-                                            .generics
-                                            .clone()
-                                            .into_iter()
-                                            .map(|generic| {
-                                                if generics
-                                                    .contains(&std::borrow::Cow::Borrowed(&generic))
-                                                {
-                                                    tvar!(self.0.len() + 1)
-                                                } else {
-                                                    tconst!(generic)
-                                                }
-                                            })
-                                            .collect(),
-                                        traits: vec![],
-                                    })
-                                    .into(),
-                                )
-                            })
-                            .collect::<Vec<(_, Arc<Type>)>>(),
+                        generics.iter().map(|g| g.to_string()).collect(),
+                        processed_fields_string.clone(),
                     ),
                 );
+
                 TypedNode::Struct(
-                    std::borrow::Cow::Borrowed(name),
-                    generics.to_vec(),
-                    fields
-                        .iter()
-                        .map(|(name, ty)| {
-                            (
-                                name.clone(),
-                                Type::Constructor(TypeConstructor {
-                                    name: ty.name.to_string(),
-                                    generics: ty
-                                        .generics
-                                        .clone()
-                                        .into_iter()
-                                        .map(|generic| {
-                                            if generics
-                                                .contains(&std::borrow::Cow::Borrowed(&generic))
-                                            {
-                                                tvar!(self.0.len() + 1)
-                                            } else {
-                                                tconst!(generic)
-                                            }
-                                        })
-                                        .collect(),
-                                    traits: vec![],
-                                })
-                                .into(),
-                            )
-                        })
-                        .collect::<Vec<(_, Arc<Type>)>>(),
+                    Cow::Borrowed(name),
+                    generics.iter().map(|g| g.clone()).collect(),
+                    processed_fields,
                 )
             }
             Node::Extern(name, args, ret_type) => {
@@ -1024,6 +971,37 @@ impl<'a> TypeEnv {
         let x = self.substitute_type_vars_in_typed_node(typed_node, substitutions);
         // println!("{:#?}", x);
         Ok(x)
+    }
+
+    // Helper to resolve field types with generic substitution
+    fn resolve_field_type(
+        &self,
+        field_type: &TypeAnnot,
+        generic_map: &HashMap<&str, Arc<Type>>,
+        struct_generics: &[Cow<'_, str>],
+    ) -> Arc<Type> {
+        let resolved_generics = field_type
+            .generics
+            .iter()
+            .map(|g| {
+                if struct_generics.iter().any(|sg| sg == g) {
+                    generic_map[g.as_str()].clone()
+                } else {
+                    tconst!(g)
+                }
+            })
+            .collect();
+
+        if struct_generics.contains(&Cow::Borrowed(field_type.name.as_str())) {
+            generic_map[field_type.name.as_str()].clone()
+        } else {
+            Type::Constructor(TypeConstructor {
+                name: field_type.name.clone(),
+                generics: resolved_generics,
+                traits: vec![],
+            })
+            .into()
+        }
     }
 
     fn substitute_type_vars(

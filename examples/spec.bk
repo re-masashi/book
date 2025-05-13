@@ -3,6 +3,13 @@ struct Point
 	y int
 end
 
+struct Box
+end
+
+struct Box<T>
+	val T
+end
+
 def test_while(n: int) -> int do
 	let i = 0
 	let sum = 0
@@ -31,3 +38,4 @@ println(type(3.14))
 println(type(true));
 
 println(fact(13))
+
