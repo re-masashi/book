@@ -235,7 +235,6 @@ impl<'ctx> IRGenerator<'ctx> {
         let _print_func = self.module.add_function("printf", printf_type, None);
     }
 
-
     pub fn gen_program(
         &mut self,
         node: &TypedNode<'ctx>,
@@ -332,11 +331,15 @@ impl<'ctx> IRGenerator<'ctx> {
                             self.gen_extern(name.to_string(), args.to_vec(), ret.clone())?;
                         }
                         TypedNode::Struct(name, generics, fields) => {
-                            let generic_params: Vec<String> = generics.iter().map(|g| g.to_string()).collect();
-                            let field_types: Vec<(String, Arc<Type>)> = fields.clone().iter()
+                            let generic_params: Vec<String> =
+                                generics.iter().map(|g| g.to_string()).collect();
+                            let field_types: Vec<(String, Arc<Type>)> = fields
+                                .clone()
+                                .iter()
                                 .map(|(fname, ftype)| (fname.to_string(), ftype.clone()))
                                 .collect();
-                            self.generic_structs.insert(name.to_string(), (generic_params, field_types));
+                            self.generic_structs
+                                .insert(name.to_string(), (generic_params, field_types));
                             println!("structs {:#?}", self.generic_structs);
                             // let mut arg_types = vec![];
                             // let mut field_types = vec![];
