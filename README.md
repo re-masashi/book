@@ -2,6 +2,8 @@
 A compiled language with some nice type inference and a garbage collector. 
 ---
 
+**STRUCTS DONT WORK RIGHT NOW BECAUSE OF AN ONGOING CHANGE. PLEASE CLONE PREVIOUS COMMITS!**
+
 ## Overview
 Book is a tiny compiled programming language designed to combine performance and simplicity. With strong type inference and an efficient garbage collector (the Boehm GC), Book aims to be both enjoyable and productive.
 
