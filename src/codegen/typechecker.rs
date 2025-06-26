@@ -886,7 +886,7 @@ impl<'a> TypeEnv {
                 let processed_fields = fields
                     .iter()
                     .map(|(field_name, field_type)| {
-                        let ty = self.resolve_field_type(field_type, &generic_map, &generics);
+                        let ty = self.resolve_field_type(field_type, &generic_map, generics);
                         (field_name.clone(), ty)
                     })
                     .collect::<Vec<_>>();
@@ -895,7 +895,7 @@ impl<'a> TypeEnv {
                 let processed_fields_string = fields
                     .iter()
                     .map(|(field_name, field_type)| {
-                        let ty = self.resolve_field_type(field_type, &generic_map, &generics);
+                        let ty = self.resolve_field_type(field_type, &generic_map, generics);
                         (field_name.to_string(), ty)
                     })
                     .collect::<Vec<_>>();
@@ -926,7 +926,7 @@ impl<'a> TypeEnv {
 
                 TypedNode::Struct(
                     Cow::Borrowed(name),
-                    generics.iter().map(|g| g.clone()).collect(),
+                    generics.to_vec(),
                     processed_fields,
                 )
             }

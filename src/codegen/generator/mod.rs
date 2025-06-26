@@ -62,7 +62,7 @@ pub struct IRGenerator<'ctx> {
     polymorphic_functions: HashMap<String, Vec<PolyMorphicFunction<'ctx>>>,
     builtins: Vec<IRValue<'ctx>>,
     loop_bbs: Option<(BasicBlock<'ctx>, BasicBlock<'ctx>)>,
-    generic_structs: HashMap<String, (Vec<String>, Vec<(String, Arc<Type>)>)>,
+    // generic_structs: HashMap<String, (Vec<String>, Vec<(String, Arc<Type>)>)>,
 }
 
 pub struct PolyMorphicFunction<'ctx>(
@@ -179,7 +179,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 IRValue::BuiltIn("set".to_string()),
             ],
             loop_bbs: None,
-            generic_structs: HashMap::new(),
+            // generic_structs: HashMap::new(),
         }
     }
 
@@ -330,17 +330,17 @@ impl<'ctx> IRGenerator<'ctx> {
                         TypedNode::Extern(name, args, ret) => {
                             self.gen_extern(name.to_string(), args.to_vec(), ret.clone())?;
                         }
-                        TypedNode::Struct(name, generics, fields) => {
-                            let generic_params: Vec<String> =
+                        TypedNode::Struct(_name, generics, fields) => {
+                            let _generic_params: Vec<String> =
                                 generics.iter().map(|g| g.to_string()).collect();
-                            let field_types: Vec<(String, Arc<Type>)> = fields
+                            let _field_types: Vec<(String, Arc<Type>)> = fields
                                 .clone()
                                 .iter()
                                 .map(|(fname, ftype)| (fname.to_string(), ftype.clone()))
                                 .collect();
-                            self.generic_structs
-                                .insert(name.to_string(), (generic_params, field_types));
-                            println!("structs {:#?}", self.generic_structs);
+                            // self.generic_structs
+                                // .insert(name.to_string(), (generic_params, field_types));
+                            // println!("structs {:#?}", self.generic_structs);
                             // let mut arg_types = vec![];
                             // let mut field_types = vec![];
                             // let mut field_metadata_types = vec![];
