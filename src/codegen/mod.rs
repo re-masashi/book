@@ -261,7 +261,7 @@ impl TypeEnv {
                     || start_col > lines[start_line].len()
                     || end_col > lines[end_line].len()
                 {
-                    eprintln!("Invalid span: {:?} in file {}", span, file);
+                    eprintln!("Invalid span: {span:?} in file {file}");
                     return;
                 }
 
@@ -269,7 +269,7 @@ impl TypeEnv {
                 let pre_line = if start_line > 0 {
                     lines
                         .get(start_line - 1)
-                        .map(|l| format!("{} | {}", start_line, l))
+                        .map(|l| format!("{start_line} | {l}"))
                 } else {
                     None
                 };
@@ -319,14 +319,13 @@ impl TypeEnv {
                     start_col
                 ));
 
-                eprintln!("{}", error_output);
+                eprintln!("{error_output}");
             }
             Err(e) => {
                 eprintln!(
-                    "{} Failed to open file {}: {}",
+                    "{} Failed to open file {}: {e}",
                     "[Error]".red(),
                     file.green(),
-                    e
                 );
             }
         }
@@ -544,7 +543,7 @@ impl TypeVariable {
             }
             Type::Function(_, _) => false,
             // Type::Struct(_, _, _) => todo!(),
-            x => todo!("{:?}", x),
+            x => todo!("{x:?}"),
         }
     }
 }
@@ -593,8 +592,8 @@ fn unify(
         ) => {
             if name1 != name2 {
                 return Err(TypeError::TypeMismatch {
-                    expected: format!("'{}'", name1),
-                    found: format!("'{}'", name2),
+                    expected: format!("'{name1}'"),
+                    found: format!("'{name2}'"),
                     span: *span,
                     file: file.clone(),
                 });
@@ -662,8 +661,8 @@ fn unify(
         (Type::Struct(name, generics, fields), Type::Struct(name2, generics2, fields2)) => {
             if name != name2 {
                 return Err(TypeError::TypeMismatch {
-                    expected: format!("struct '{}'", name),
-                    found: format!("struct '{}'", name2),
+                    expected: format!("struct '{name}'"),
+                    found: format!("struct '{name2}'"),
                     span: *span,
                     file: file.clone(),
                 });
@@ -728,8 +727,8 @@ fn unify(
             file: file.clone(),
         }),
         _ => Err(TypeError::UnhandledType {
-            left: format!("{:?}", left),
-            right: format!("{:?}", right),
+            left: format!("{left:?}"),
+            right: format!("{right:?}"),
             span: *span,
             file: file.clone(),
         }),

@@ -69,7 +69,7 @@ impl Parser<'_> {
             | TokenType::LessEq => 0,
             TokenType::Minus | TokenType::Plus => 1,
             TokenType::DivEq | TokenType::Mul => 2,
-            any => panic!("Bad operator! Unknown {:?}", any),
+            any => panic!("Bad operator! Unknown {any:?}"),
         }
     }
 
@@ -120,12 +120,12 @@ impl Parser<'_> {
                 } else {
                     lines
                         .get(start_line - 1)
-                        .map(|l| format!("{} | {}", start_line, l))
+                        .map(|l| format!("{start_line} | {l}"))
                 };
                 let current_line = &lines[start_line];
                 let post_line = lines
                     .get(start_line + 1)
-                    .map(|l| format!("{} | {}", start_line + 2, l));
+                    .map(|l| format!("{} | {l}", start_line + 2));
 
                 // Create pointy indicators
                 let start_pointy = format!("{:~<width$}^", "", width = start_col + 1);
@@ -149,32 +149,26 @@ impl Parser<'_> {
                     "\n\
                      {}\n\
                      {} | {}\n\
-                     {}{}{}\n\
+                     {padding}{}{}\n\
                      {}\n\
-                     {}: {}\n\
+                     {}: {message}\n\
                      at line {}:{} in file `{}`.",
                     pre_line.unwrap_or_default().yellow(),
                     (start_line + 1).green(),
                     current_line.yellow(),
-                    padding,
                     start_pointy.red(),
                     end_pointy.red(),
                     post_line.unwrap_or_default().yellow(),
                     "[Syntax Error]".red(),
-                    message,
                     (start_line + 1).green(),
                     (start_col + 1).green(),
                     self.file.green(),
                 );
 
-                eprintln!("{}", error_message);
+                eprintln!("{error_message}");
             }
             Err(error) => {
-                eprintln!(
-                    "Error: Could not open file: {}. {}",
-                    self.file.green(),
-                    error
-                );
+                eprintln!("Error: Could not open file: {}. {error}", self.file.green());
             }
         }
     }

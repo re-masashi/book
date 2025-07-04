@@ -51,8 +51,7 @@ impl<'a> Parser<'_> {
             TokenType::Identifier(i) => i.to_string(),
             ref x => {
                 return Err(format!(
-                    "expected identifier after struct keyword. found `{}`",
-                    x
+                    "expected identifier after struct keyword. found `{x}`"
                 ))
             }
         };
@@ -67,7 +66,7 @@ impl<'a> Parser<'_> {
                         generics.push(std::borrow::Cow::Owned(argname.clone()));
                         self.advance();
                     }
-                    ref x => return Err(format!("expected identifier in generic. found {}", x)),
+                    ref x => return Err(format!("expected identifier in generic. found {x}")),
                 }
                 if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                     self.advance(); // Eat ','
@@ -101,8 +100,7 @@ impl<'a> Parser<'_> {
                 }
                 ref x => {
                     return Err(format!(
-                        "expected identifier in field of struct `{name}`'s definition. found {}",
-                        x
+                        "expected identifier in field of struct `{name}`'s definition. found {x}"
                     ))
                 }
             }
@@ -125,8 +123,7 @@ impl<'a> Parser<'_> {
             TokenType::Identifier(ref n) => n.clone(),
             ref x => {
                 return Err(format!(
-                    "expected a function name after 'extern'. found {}",
-                    x
+                    "expected a function name after 'extern'. found {x}"
                 ))
             }
         };
@@ -159,12 +156,7 @@ impl<'a> Parser<'_> {
                     }
                 }
             }
-            ref x => {
-                return Err(format!(
-                    "expected arguments after function name. found {}",
-                    x
-                ))
-            }
+            ref x => return Err(format!("expected arguments after function name. found {x}")),
         };
 
         let ret_type = if unwrap_some!(self.tokens.peek()).type_ == TokenType::Arrow {

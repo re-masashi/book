@@ -35,12 +35,7 @@ fn test_typechecker_inference() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -64,12 +59,7 @@ fn test_typechecker_fail() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -92,12 +82,7 @@ fn test_typechecker_binop_int_add() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -120,12 +105,7 @@ fn test_typechecker_binop_int_sub() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -148,12 +128,7 @@ fn test_typechecker_binop_int_mul() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -176,12 +151,7 @@ fn test_typechecker_binop_int_div() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -204,12 +174,7 @@ fn test_typechecker_binop_float_add() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -232,12 +197,7 @@ fn test_typechecker_binop_float_sub() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -260,12 +220,7 @@ fn test_typechecker_binop_float_mul() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -288,12 +243,7 @@ fn test_typechecker_binop_float_div() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -312,12 +262,7 @@ fn test_typechecker_let() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -352,12 +297,7 @@ fn test_typechecker_let_contradicting_types() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -370,12 +310,7 @@ fn test_typechecker_variable() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -403,12 +338,7 @@ fn test_typechecker_lambda() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -421,12 +351,7 @@ fn test_typechecker_literal_int() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -439,12 +364,7 @@ fn test_typechecker_literal_float() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -457,12 +377,7 @@ fn test_typechecker_literal_boolean() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -475,12 +390,7 @@ fn test_typechecker_literal_string() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -497,12 +407,7 @@ fn test_typechecker_array() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -525,12 +430,7 @@ fn test_typechecker_array_fail() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -559,12 +459,7 @@ fn test_typechecker_if() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }
 
@@ -592,11 +487,6 @@ fn test_typechecker_if_mismatch() {
         "".to_string(),
     );
     let _ = env
-        .expr_to_type(
-            &ast,
-            &Span((0, 0), (0, 0)),
-            &"".to_string(),
-            &mut HashMap::new(),
-        )
+        .expr_to_type(&ast, &Span((0, 0), (0, 0)), "", &mut HashMap::new())
         .unwrap();
 }

@@ -43,7 +43,7 @@ impl<'a> TypeEnv {
                                         .clone()
                                         .into_iter()
                                         .map(|generic| {
-                                            trace!("{name}{:?}", generic);
+                                            trace!("{name}{generic:?}");
                                             tconst!(generic)
                                         })
                                         .collect(),
@@ -259,7 +259,7 @@ impl<'a> TypeEnv {
                         )
                     }
                     Type::Constructor(..) => {
-                        panic!("invalid function {:?}", value_);
+                        panic!("invalid function {value_:?}");
                     }
                     Type::Struct(..) => {
                         todo!()
@@ -613,7 +613,7 @@ impl<'a> TypeEnv {
         let typed_node = match node {
             Node::Function(name, args, ret, ty) => match ty {
                 Some(ty) => {
-                    trace!("{:?}", ty);
+                    trace!("{ty:?}");
                     let mut is_poly = false;
                     for (_, argtype) in args {
                         match argtype {
@@ -724,7 +724,7 @@ impl<'a> TypeEnv {
                     retval
                 }
                 None => {
-                    trace!("{:?}", ty);
+                    trace!("{ty:?}");
                     let mut is_poly = false;
                     for (_, argtype) in args {
                         match argtype {
@@ -796,7 +796,7 @@ impl<'a> TypeEnv {
                                                 .clone()
                                                 .into_iter()
                                                 .map(|generic| {
-                                                    trace!("{name}{:?}", generic);
+                                                    trace!("{name}{generic:?}");
                                                     tconst!(generic)
                                                 })
                                                 .collect(),
@@ -858,7 +858,7 @@ impl<'a> TypeEnv {
                 let (e, t) = self.expr_to_type(e, span, file, substitutions)?;
                 TypedNode::Expr(Box::new(e), t)
             }
-            Node::Error(e) => panic!("{:?}", e),
+            Node::Error(e) => panic!("{e:?}"),
             Node::Program(nodes) => {
                 let mut nodes_ = vec![];
                 for (node, span, file) in nodes {

@@ -33,10 +33,10 @@ impl<'a> Parser<'_> {
                         ));
                     }
                 }
-                println!("{:?}", vals);
+                println!("{vals:?}");
                 todo!()
             }
-            x => return Err(format!("invalid type without an identifier. found `{}`", x)),
+            x => return Err(format!("invalid type without an identifier. found `{x}`")),
         };
         let mut generics = vec![];
         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Less {
@@ -48,7 +48,7 @@ impl<'a> Parser<'_> {
                         generics.push(argname.to_string());
                         self.advance();
                     }
-                    ref x => return Err(format!("expected identifier in generic. found {}", x)),
+                    ref x => return Err(format!("expected identifier in generic. found {x}")),
                 }
                 if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                     self.advance(); // Eat ','
@@ -80,7 +80,7 @@ impl<'a> Parser<'_> {
         let token = self.advance();
         let name = match token.type_ {
             TokenType::Identifier(ref n) => n.clone(),
-            ref x => return Err(format!("expected a function name after 'def'. found {}", x)),
+            ref x => return Err(format!("expected a function name after 'def'. found {x}")),
         };
 
         let token = self.advance();
@@ -101,7 +101,7 @@ impl<'a> Parser<'_> {
                                     args.push((argname_clone, None));
                                 }
                             }
-                            ref x => return Err(format!("expected identifier. found {}", x)),
+                            ref x => return Err(format!("expected identifier. found {x}")),
                         }
                         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                             self.advance(); // Eat ','
@@ -114,12 +114,7 @@ impl<'a> Parser<'_> {
                     }
                 }
             }
-            ref x => {
-                return Err(format!(
-                    "expected arguments after function name. found {}",
-                    x
-                ))
-            }
+            ref x => return Err(format!("expected arguments after function name. found {x}",)),
         };
 
         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Arrow {

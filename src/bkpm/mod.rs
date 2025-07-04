@@ -31,9 +31,9 @@ pub struct LockedDep {
 }
 
 pub fn init_package(name: &str) -> std::io::Result<()> {
-    fs::create_dir_all(format!("{}/src", name))?;
+    fs::create_dir_all(format!("{name}/src"))?;
 
-    let main_path = format!("{}/src/main.bk", name);
+    let main_path = format!("{name}/src/main.bk");
     File::create(main_path)?.write_all(b"println(\"Hello, world!\")\n")?;
 
     let pkg = BkPackage {
@@ -42,10 +42,10 @@ pub fn init_package(name: &str) -> std::io::Result<()> {
         dependencies: None,
     };
 
-    let mut manifest = File::create(format!("{}/bkpm.toml", name))?;
+    let mut manifest = File::create(format!("{name}/bkpm.toml"))?;
     manifest.write_all(toml::to_string(&pkg).unwrap().as_bytes())?;
 
-    println!("Initialized package `{}`", name);
+    println!("Initialized package `{name}`");
     Ok(())
 }
 
@@ -64,7 +64,7 @@ pub fn build_dependencies() -> std::io::Result<()> {
                 if Path::new(&clone_path).exists() {
                     println!("Already exists: {}", dep.name);
                 } else {
-                    println!("Cloning {} from {}", dep.name, repo);
+                    println!("Cloning {} from {repo}", dep.name);
                     Command::new("git")
                         .args(["clone", "--depth=1", repo, &clone_path])
                         .status()
@@ -107,8 +107,8 @@ pub fn install_dependency(name: &str, git: &str, version: &str) -> std::io::Resu
         toml::from_str(&fs::read_to_string("bkpm.toml")?).expect("invalid bkpm.toml");
 
     // Avoid duplicate install
-    if Path::new(&format!("bkpm_modules/{}", name)).exists() {
-        println!("`{}` already installed. Skipping.", name);
+    if Path::new(&format!("bkpm_modules/{name}")).exists() {
+        println!("`{name}` already installed. Skipping.");
         return Ok(());
     }
 
@@ -117,7 +117,7 @@ pub fn install_dependency(name: &str, git: &str, version: &str) -> std::io::Resu
         .args(["ls-remote", git, "HEAD"])
         .output()?;
     if !validate.status.success() {
-        panic!("Git repo `{}` does not exist or is inaccessible", git);
+        panic!("Git repo `{git}` does not exist or is inaccessible");
     }
 
     // Add to bkpm.toml
@@ -139,12 +139,12 @@ pub fn install_dependency(name: &str, git: &str, version: &str) -> std::io::Resu
     // Clone repo
     fs::create_dir_all("bkpm_modules")?;
     Command::new("git")
-        .args(["clone", "--depth=1", git, &format!("bkpm_modules/{}", name)])
+        .args(["clone", "--depth=1", git, &format!("bkpm_modules/{name}")])
         .status()
         .expect("failed to clone repo");
 
     // Record commit
-    let rev = get_git_commit_hash(&format!("bkpm_modules/{}", name))?;
+    let rev = get_git_commit_hash(&format!("bkpm_modules/{name}"))?;
 
     // Update lockfile
     let mut lock = if Path::new("bkpm.lock").exists() {
@@ -161,16 +161,16 @@ pub fn install_dependency(name: &str, git: &str, version: &str) -> std::io::Resu
     }
     fs::write("bkpm.lock", toml::to_string_pretty(&lock).unwrap())?;
 
-    println!("Installed `{}` from {}", name, git);
+    println!("Installed `{name}` from {git}");
 
     // Recursively build transitive dependencies
-    build_dependencies_from(&format!("bkpm_modules/{}", name))?;
+    build_dependencies_from(&format!("bkpm_modules/{name}"))?;
 
     Ok(())
 }
 
 pub fn build_dependencies_from(path: &str) -> std::io::Result<()> {
-    let manifest_path = format!("{}/bkpm.toml", path);
+    let manifest_path = format!("{path}/bkpm.toml");
     if !Path::new(&manifest_path).exists() {
         return Ok(());
     }

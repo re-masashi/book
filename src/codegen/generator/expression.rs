@@ -57,7 +57,7 @@ impl<'ctx> IRGenerator<'ctx> {
                             .unwrap();
                         Ok((IRValue::Simple(value), type_.clone()))
                     }
-                    None => Err(format!("Variable '{}' not found", name)),
+                    None => Err(format!("Variable '{name}' not found")),
                 }
             }
             TypedExpr::Lambda(args, body, return_type_, _span, _file) => {
@@ -177,8 +177,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         val_type,
                     )),
                     _ => Err(format!(
-                        "Unsupported unary operator or type: {:?} {:?}",
-                        op, type_
+                        "Unsupported unary operator or type: {op:?} {type_:?}"
                     )),
                 }
             }
@@ -238,7 +237,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                 llvm_elem_ty,
                                 data_ptr,
                                 &[self.context.i64_type().const_int(i as u64, false)],
-                                &format!("array_gep_{}", i),
+                                &format!("array_gep_{i}"),
                             )
                             .unwrap()
                     };

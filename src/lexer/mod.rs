@@ -165,12 +165,12 @@ impl Iterator for Lexer {
                 self.get_next_char_while(&mut value, |c| c.is_numeric());
                 token = match value.parse::<f64>() {
                     Ok(i) => Ok(TokenType::Float(i)),
-                    Err(_) => Err(format!("Integer literal {} is invalid", value)),
+                    Err(_) => Err(format!("Integer literal {value} is invalid")),
                 }
             } else {
                 token = match value.parse::<i64>() {
                     Ok(i) => Ok(TokenType::Int(i)),
-                    Err(_) => Err(format!("Integer literal {} is invalid", value)),
+                    Err(_) => Err(format!("Integer literal {value} is invalid")),
                 }
             }
         }

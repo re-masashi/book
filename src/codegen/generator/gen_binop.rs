@@ -238,8 +238,7 @@ impl<'ctx> IRGenerator<'ctx> {
                             Ok(_) => {}
                             Err(e) => {
                                 return Err(format!(
-                                    "something went wrong during `or` codegen. {}",
-                                    e
+                                    "something went wrong during `or` codegen. {e}"
                                 ))
                             }
                         };
@@ -298,8 +297,7 @@ impl<'ctx> IRGenerator<'ctx> {
                             Ok(_) => {}
                             Err(e) => {
                                 return Err(format!(
-                                    "something went wrong during `and` codegen. {}",
-                                    e
+                                    "something went wrong during `and` codegen. {e}",
                                 ))
                             }
                         };
@@ -323,8 +321,7 @@ impl<'ctx> IRGenerator<'ctx> {
                             Ok(_) => {}
                             Err(e) => {
                                 return Err(format!(
-                                    "something went wrong during `and` codegen. {}",
-                                    e
+                                    "something went wrong during `and` codegen. {e}",
                                 ))
                             }
                         };
@@ -335,8 +332,7 @@ impl<'ctx> IRGenerator<'ctx> {
                             Ok(_) => {}
                             Err(e) => {
                                 return Err(format!(
-                                    "something went wrong during `and` codegen. {}",
-                                    e
+                                    "something went wrong during `and` codegen. {e}",
                                 ))
                             }
                         }; // Short-circuit: if lhs is false, the result is false
@@ -500,8 +496,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
                     _ => {
                         return Err(format!(
-                            "Unsupported operator or type combination: {:?} {:?} {:?}",
-                            op, lhs_type, rhs_type
+                            "Unsupported operator or type combination: {op:?} {lhs_type:?} {rhs_type:?}",
                         ))
                     }
                 };

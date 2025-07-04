@@ -489,7 +489,7 @@ impl<'ctx> IRGenerator<'ctx> {
 
         match self.module.verify() {
             Ok(_) => {}
-            Err(e) => return Err(format!("couldn't verify the module!. {}", e)),
+            Err(e) => return Err(format!("couldn't verify the module!. {e}")),
         };
         if optimisation_level != 0 {
             self.module
@@ -546,7 +546,7 @@ impl<'ctx> IRGenerator<'ctx> {
             .expect("failed to execute process");
 
         if !result.status.success() {
-            eprintln!("Build failed: {:?}", result);
+            eprintln!("Build failed: {result:?}");
             return Err("build failed".to_string());
         }
 
@@ -610,7 +610,7 @@ impl<'ctx> IRGenerator<'ctx> {
                 }
                 // IRType::Simple(self.context.ptr_type(AddressSpace::from(0)).into())
             }
-            _ => panic!("Type to llvm not possible for {:?}", ty),
+            _ => panic!("Type to llvm not possible for {ty:?}"),
         }
     }
 }
@@ -662,8 +662,7 @@ pub fn error(filename: String, span: Span, message: String) {
                 || end_col > lines[end_line].len()
             {
                 eprintln!(
-                    "Invalid span: Line or column numbers out of bounds. {:?} {}",
-                    span,
+                    "Invalid span: Line or column numbers out of bounds. {span:?} {}",
                     lines.len()
                 );
                 return;
@@ -675,12 +674,12 @@ pub fn error(filename: String, span: Span, message: String) {
             } else {
                 lines
                     .get(start_line - 1)
-                    .map(|l| format!("{} | {}", start_line, l))
+                    .map(|l| format!("{start_line} | {l}"))
             };
             let current_line = &lines[start_line];
             let post_line = lines
                 .get(start_line + 1)
-                .map(|l| format!("{} | {}", start_line + 2, l));
+                .map(|l| format!("{} | {l}", start_line + 2));
 
             // Create pointy indicators
             let start_pointy = format!("{:~<width$}^", "", width = start_col + 1);
@@ -704,25 +703,23 @@ pub fn error(filename: String, span: Span, message: String) {
                 "\n\
                  {}\n\
                  {} | {}\n\
-                 {}{}{}\n\
+                 {padding}{}{}\n\
                  {}\n\
-                 {}: {}\n\
+                 {}: {message}\n\
                  at line {}:{} in file `{}`.",
                 pre_line.unwrap_or_default().yellow(),
                 (start_line + 1).green(),
                 current_line.yellow(),
-                padding,
                 start_pointy.red(),
                 end_pointy.red(),
                 post_line.unwrap_or_default().yellow(),
                 "[Codegen Error]".red(),
-                message,
                 (start_line + 1).green(),
                 (start_col + 1).green(),
                 filename.green(),
             );
 
-            eprintln!("{}", error_message);
+            eprintln!("{error_message}");
         }
         Err(error) => {
             eprintln!(

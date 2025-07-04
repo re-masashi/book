@@ -76,8 +76,7 @@ impl<'a> Parser<'_> {
                     TokenType::Then => {}
                     ref x => {
                         return Err(format!(
-                            "expected `then` after while-loop condition. found `{}`",
-                            x
+                            "expected `then` after while-loop condition. found `{x}`"
                         ))
                     }
                 }
@@ -109,7 +108,7 @@ impl<'a> Parser<'_> {
                 self.span,
                 self.file.clone(),
             ),
-            ref x => return Err(format!("expected a valid expression. found `{}`.", x)),
+            ref x => return Err(format!("expected a valid expression. found `{x}`.")),
         };
 
         loop {
@@ -176,8 +175,7 @@ impl<'a> Parser<'_> {
                         TokenType::Identifier(i) => i,
                         x => {
                             return Err(format!(
-                                "expected identifier after '.' for struct field access. found {}",
-                                x
+                                "expected identifier after '.' for struct field access. found {x}"
                             ))
                         }
                     };
@@ -343,8 +341,7 @@ impl<'a> Parser<'_> {
             ref x => {
                 return Err(format!(
                     "Expected `then` after `if` condition. 
-                    found `{}`.",
-                    x
+                    found `{x}`."
                 ))
             }
         }
@@ -392,8 +389,7 @@ impl<'a> Parser<'_> {
             TokenType::Identifier(ref i) => std::borrow::Cow::Owned(i.clone()),
             ref x => {
                 return Err(format!(
-                    "Expected `identifier` after `let` keyword. Found `{}`",
-                    x
+                    "Expected `identifier` after `let` keyword. Found `{x}`"
                 ))
             }
         };
@@ -408,7 +404,7 @@ impl<'a> Parser<'_> {
 
         match self.advance().type_ {
             TokenType::Assign => {}
-            ref x => return Err(format!("expected `=` after `let`. Found `{}`", x)),
+            ref x => return Err(format!("expected `=` after `let`. Found `{x}`")),
         }
 
         let val = self.parse_expression()?.0;
@@ -446,7 +442,7 @@ impl<'a> Parser<'_> {
                                     args.push((argname_clone, None));
                                 }
                             }
-                            ref x => return Err(format!("expected identifier. found `{}`", x)),
+                            ref x => return Err(format!("expected identifier. found `{x}`")),
                         }
                         if unwrap_some!(self.tokens.peek()).type_ == TokenType::Comma {
                             self.advance(); // Eat ','
@@ -461,8 +457,7 @@ impl<'a> Parser<'_> {
             }
             ref x => {
                 return Err(format!(
-                    "expected arguments after function name. found `{}`",
-                    x
+                    "expected arguments after function name. found `{x}`"
                 ))
             }
         };

@@ -154,7 +154,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                                 &Literal::String(format!("<{}>", c.name).into()),
                                             )),
                                             Type::Struct(name, ..) => Ok(self.gen_literal(
-                                                &Literal::String(format!("<{}>", name).into()),
+                                                &Literal::String(format!("<{name}>").into()),
                                             )),
                                             Type::Function(..) => Ok(self.gen_literal(
                                                 &Literal::String("<function>".to_string().into()),
@@ -167,9 +167,8 @@ impl<'ctx> IRGenerator<'ctx> {
                                         }
                                     }
                                     IRType::BuiltIn => todo!(),
-                                    IRType::Struct(name, ..) => Ok(self.gen_literal(
-                                        &Literal::String(format!("<{}>", name).into()),
-                                    )),
+                                    IRType::Struct(name, ..) => Ok(self
+                                        .gen_literal(&Literal::String(format!("<{name}>").into()))),
                                     IRType::Function(..)
                                     | IRType::PolyMorph
                                     | IRType::Returned(..) => todo!(),
@@ -298,7 +297,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                                 &Literal::String(format!("<{}>", c.name).into()),
                                             )),
                                             Type::Struct(name, ..) => Ok(self.gen_literal(
-                                                &Literal::String(format!("<{}>", name).into()),
+                                                &Literal::String(format!("<{name}>").into()),
                                             )),
                                             Type::Function(..) => Ok(self.gen_literal(
                                                 &Literal::String("<function>".to_string().into()),
@@ -311,8 +310,10 @@ impl<'ctx> IRGenerator<'ctx> {
                                         }
                                     }
                                     IRType::BuiltIn => todo!(),
-                                    IRType::Struct(v, ..) => Ok(self
-                                        .gen_literal(&Literal::String(format!("<{}>", v).into()))),
+                                    IRType::Struct(v, ..) => {
+                                        Ok(self
+                                            .gen_literal(&Literal::String(format!("<{v}>").into())))
+                                    }
                                     IRType::Function(..)
                                     | IRType::PolyMorph
                                     | IRType::Returned(..) => todo!(),
@@ -413,7 +414,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                                 &Literal::String(format!("<{}>", c.name).into()),
                                             )),
                                             Type::Struct(name, ..) => Ok(self.gen_literal(
-                                                &Literal::String(format!("<{}>", name).into()),
+                                                &Literal::String(format!("<{name}>").into()),
                                             )),
                                             Type::Function(..) => Ok(self.gen_literal(
                                                 &Literal::String("<function>".to_string().into()),
@@ -427,9 +428,8 @@ impl<'ctx> IRGenerator<'ctx> {
                                         }
                                     }
                                     IRType::BuiltIn => todo!(),
-                                    IRType::Struct(name, ..) => Ok(self.gen_literal(
-                                        &Literal::String(format!("<{}>", name).into()),
-                                    )),
+                                    IRType::Struct(name, ..) => Ok(self
+                                        .gen_literal(&Literal::String(format!("<{name}>").into()))),
                                     IRType::Function(..)
                                     | IRType::PolyMorph
                                     | IRType::Returned(..) => todo!(),
@@ -813,7 +813,7 @@ impl<'ctx> IRGenerator<'ctx> {
                         else {
                             unreachable!()
                         };
-                        println!("{:?}", substitutions);
+                        println!("{substitutions:?}");
 
                         let (IRValue::Function(function_to_call, _, _), _fn_type) = self
                             .gen_function(
