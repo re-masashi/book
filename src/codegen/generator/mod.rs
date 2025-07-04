@@ -339,7 +339,7 @@ impl<'ctx> IRGenerator<'ctx> {
                                 .map(|(fname, ftype)| (fname.to_string(), ftype.clone()))
                                 .collect();
                             // self.generic_structs
-                                // .insert(name.to_string(), (generic_params, field_types));
+                            // .insert(name.to_string(), (generic_params, field_types));
                             // println!("structs {:#?}", self.generic_structs);
                             // let mut arg_types = vec![];
                             // let mut field_types = vec![];

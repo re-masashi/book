@@ -924,11 +924,7 @@ impl<'a> TypeEnv {
                     ),
                 );
 
-                TypedNode::Struct(
-                    Cow::Borrowed(name),
-                    generics.to_vec(),
-                    processed_fields,
-                )
+                TypedNode::Struct(Cow::Borrowed(name), generics.to_vec(), processed_fields)
             }
             Node::Extern(name, args, ret_type) => {
                 let annoted_type: Arc<Type> = Type::Constructor(TypeConstructor {
